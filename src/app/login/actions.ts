@@ -26,6 +26,11 @@ export async function signup(formData: FormData) {
   const data = {
     email: formData.get('email') as string,
     password: formData.get('password') as string,
+    options: {
+      data: {
+        name: formData.get('name') as string,
+      }
+    }
   };
 
   const { data: result, error } = await supabase.auth.signUp(data);
@@ -34,9 +39,7 @@ export async function signup(formData: FormData) {
     redirect(`/login/signup?error=${encodeURIComponent(error.message)}`);
   }
 
-  // 성공 시
   if (result?.user && !result?.session) {
-    // 이메일 확인이 필요한 경우
     redirect('/login/signup?message=이메일 확인 후 로그인해주세요');
   }
 
