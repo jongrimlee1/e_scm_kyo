@@ -114,6 +114,7 @@ CREATE TABLE customers (
     email VARCHAR(255),
     grade VARCHAR(20) DEFAULT 'NORMAL' CHECK (grade IN ('NORMAL', 'VIP', 'VVIP')),
     primary_branch_id UUID REFERENCES branches(id),
+    assigned_to UUID REFERENCES users(id),
     cafe24_member_id VARCHAR(50),
     health_note TEXT,
     metadata JSONB DEFAULT '{}',

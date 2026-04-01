@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
 import CustomerModal from './CustomerModal';
 
@@ -136,12 +137,12 @@ export default function CustomersPage() {
                 </span>
               </td>
               <td>
-                <button
-                  onClick={() => handleEdit(customer)}
+                <Link
+                  href={`/customers/${customer.id}`}
                   className="text-blue-600 hover:underline mr-2"
                 >
                   상세
-                </button>
+                </Link>
                 <button
                   onClick={() => handleEdit(customer)}
                   className="text-blue-600 hover:underline"
