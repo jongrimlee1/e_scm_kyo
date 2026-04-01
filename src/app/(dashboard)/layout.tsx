@@ -13,6 +13,7 @@ const navItems = [
   { href: '/inventory', label: '재고 관리', icon: '🏪' },
   { href: '/customers', label: '고객 관리', icon: '👥' },
   { href: '/notifications', label: '알림톡', icon: '📱' },
+  { href: '/system-codes', label: '시스템 코드', icon: '⚙️' },
   { href: '/branches', label: '지점 관리', icon: '🏢' },
   { href: '/reports', label: '보고서', icon: '📈' },
 ];

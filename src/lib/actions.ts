@@ -268,3 +268,223 @@ export async function getBranches() {
   const { data } = await supabase.from('branches').select('*').order('created_at');
   return { data: data || [] };
 }
+
+// ============ Branches (System Codes) ============
+
+export async function getBranchesAll() {
+  const supabase = await createClient();
+  const { data } = await supabase.from('branches').select('*').order('created_at', { ascending: true });
+  return { data: data || [] };
+}
+
+export async function createBranch(formData: FormData) {
+  const supabase = await createClient();
+  
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) redirect('/login');
+
+  const branchData = {
+    name: formData.get('name') as string,
+    code: formData.get('code') as string,
+    channel: formData.get('channel') as string,
+    address: formData.get('address') as string || null,
+    phone: formData.get('phone') as string || null,
+  };
+
+  // @ts-ignore
+  const { error } = await supabase.from('branches').insert(branchData);
+  
+  if (error) {
+    return { error: error.message };
+  }
+  
+  revalidatePath('/branches');
+  return { success: true };
+}
+
+export async function updateBranch(id: string, formData: FormData) {
+  const supabase = await createClient();
+  
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) redirect('/login');
+
+  const branchData = {
+    name: formData.get('name') as string,
+    code: formData.get('code') as string,
+    channel: formData.get('channel') as string,
+    address: formData.get('address') as string || null,
+    phone: formData.get('phone') as string || null,
+    is_active: formData.get('is_active') === 'true',
+  };
+
+  // @ts-ignore
+  const { error } = await supabase.from('branches').update(branchData).eq('id', id);
+  
+  if (error) {
+    return { error: error.message };
+  }
+  
+  revalidatePath('/branches');
+  return { success: true };
+}
+
+export async function deleteBranch(id: string) {
+  const supabase = await createClient();
+  
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) redirect('/login');
+
+  const { error } = await supabase.from('branches').delete().eq('id', id);
+  
+  if (error) {
+    return { error: error.message };
+  }
+  
+  revalidatePath('/branches');
+  return { success: true };
+}
+
+// ============ Customer Grades (System Codes) ============
+
+export async function getCustomerGrades() {
+  const supabase = await createClient();
+  const { data } = await supabase.from('customer_grades').select('*').order('sort_order');
+  return { data: data || [] };
+}
+
+export async function createCustomerGrade(formData: FormData) {
+  const supabase = await createClient();
+  
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) redirect('/login');
+
+  const gradeData = {
+    code: formData.get('code') as string,
+    name: formData.get('name') as string,
+    description: formData.get('description') as string || null,
+    color: formData.get('color') as string || '#6366f1',
+    sort_order: parseInt(formData.get('sort_order') as string) || 0,
+  };
+
+  // @ts-ignore
+  const { error } = await supabase.from('customer_grades').insert(gradeData);
+  
+  if (error) {
+    return { error: error.message };
+  }
+  
+  revalidatePath('/system-codes');
+  return { success: true };
+}
+
+export async function updateCustomerGrade(id: string, formData: FormData) {
+  const supabase = await createClient();
+  
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) redirect('/login');
+
+  const gradeData = {
+    code: formData.get('code') as string,
+    name: formData.get('name') as string,
+    description: formData.get('description') as string || null,
+    color: formData.get('color') as string || '#6366f1',
+    sort_order: parseInt(formData.get('sort_order') as string) || 0,
+    is_active: formData.get('is_active') === 'true',
+  };
+
+  // @ts-ignore
+  const { error } = await supabase.from('customer_grades').update(gradeData).eq('id', id);
+  
+  if (error) {
+    return { error: error.message };
+  }
+  
+  revalidatePath('/system-codes');
+  return { success: true };
+}
+
+export async function deleteCustomerGrade(id: string) {
+  const supabase = await createClient();
+  
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) redirect('/login');
+
+  const { error } = await supabase.from('customer_grades').delete().eq('id', id);
+  
+  if (error) {
+    return { error: error.message };
+  }
+  
+  revalidatePath('/system-codes');
+  return { success: true };
+}
+
+// ============ Customer Tags ============
+
+export async function getCustomerTags() {
+  const supabase = await createClient();
+  const { data } = await supabase.from('customer_tags').select('*').order('created_at');
+  return { data: data || [] };
+}
+
+export async function createCustomerTag(formData: FormData) {
+  const supabase = await createClient();
+  
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) redirect('/login');
+
+  const tagData = {
+    name: formData.get('name') as string,
+    description: formData.get('description') as string || null,
+    color: formData.get('color') as string || '#6366f1',
+  };
+
+  // @ts-ignore
+  const { error } = await supabase.from('customer_tags').insert(tagData);
+  
+  if (error) {
+    return { error: error.message };
+  }
+  
+  revalidatePath('/system-codes');
+  return { success: true };
+}
+
+export async function updateCustomerTag(id: string, formData: FormData) {
+  const supabase = await createClient();
+  
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) redirect('/login');
+
+  const tagData = {
+    name: formData.get('name') as string,
+    description: formData.get('description') as string || null,
+    color: formData.get('color') as string || '#6366f1',
+  };
+
+  // @ts-ignore
+  const { error } = await supabase.from('customer_tags').update(tagData).eq('id', id);
+  
+  if (error) {
+    return { error: error.message };
+  }
+  
+  revalidatePath('/system-codes');
+  return { success: true };
+}
+
+export async function deleteCustomerTag(id: string) {
+  const supabase = await createClient();
+  
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) redirect('/login');
+
+  const { error } = await supabase.from('customer_tags').delete().eq('id', id);
+  
+  if (error) {
+    return { error: error.message };
+  }
+  
+  revalidatePath('/system-codes');
+  return { success: true };
+}

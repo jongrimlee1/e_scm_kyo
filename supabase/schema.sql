@@ -135,13 +135,33 @@ CREATE TABLE customer_consultations (
 );
 
 -- =====================================================
+-- 고객 등급 분류 (시스템 코드)
+-- =====================================================
+CREATE TABLE customer_grades (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    code VARCHAR(20) NOT NULL UNIQUE,
+    name VARCHAR(50) NOT NULL,
+    description TEXT,
+    color VARCHAR(20) DEFAULT '#6366f1',
+    sort_order INT DEFAULT 0,
+    is_active BOOLEAN DEFAULT true,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- 기본 등급 데이터
+INSERT INTO customer_grades (code, name, description, color, sort_order) VALUES
+    ('NORMAL', '일반', '일반 고객', '#94a3b8', 1),
+    ('VIP', 'VIP', 'VIP 고객', '#f59e0b', 2),
+    ('VVIP', 'VVIP', 'VVIP 고객', '#ef4444', 3);
+
+-- =====================================================
 -- 고객 태그 분류
 -- =====================================================
 CREATE TABLE customer_tags (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name VARCHAR(50) NOT NULL UNIQUE,
     description TEXT,
-    color VARCHAR(20),
+    color VARCHAR(20) DEFAULT '#6366f1',
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
