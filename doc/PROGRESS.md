@@ -68,6 +68,27 @@
 - Admin API 엔드포인트: `/admin/orders` 사용
 - Rate Limit: Leaky Bucket (1초 2회)
 
+#### 3. 폼 입력 검증 로직 추가
+
+**파일 생성:**
+- `src/lib/validators.ts` - 공통 검증 유틸리티
+
+**검증 규칙:**
+| 필드 | 검증 타입 | 설명 |
+|------|----------|------|
+| 전화번호 | `phone` | 01x-xxxx-xxxx 형식, 자동 포맷팅 |
+| 이메일 | `email` | 이메일 형식 검증 |
+| 필수값 | `required` | 빈 값 체크 |
+| 양수 정수 | `positiveInteger` | 0 이상 정수 |
+| 코드 | `code` | 영문, 숫자, -,_만 허용 |
+
+**適용된 폼:**
+- CustomerModal: 전화번호 자동 포맷팅 + 검증
+- ProductModal: 필수값, 코드포맷, 가격 검증
+- InventoryModal: 수량 검증
+- NotificationsPage: 전화번호 검증
+- ProductionPage: 생산 수량 검증
+
 #### 2. 대시보드 고도화 (FR-D01~D05)
 **파일 생성:**
 - `src/app/(dashboard)/DashboardClient.tsx` - 대시보드 클라이언트 컴포넌트
