@@ -35,13 +35,31 @@ export async function createProduct(formData: FormData) {
   };
 
   // @ts-ignore
-  const { error } = await supabase.from('products').insert(productData);
+  const { data: newProduct, error } = await supabase.from('products').insert(productData).select().single() as any;
   
   if (error) {
     return { error: error.message };
   }
+
+  // 제품 생성 시 모든 활성 지점에 재고 레코드 자동 생성
+  const { data: branches } = await supabase
+    .from('branches')
+    .select('id')
+    .eq('is_active', true);
+
+  if (branches && branches.length > 0) {
+    const inventoryRecords = branches.map((branch: any) => ({
+      product_id: newProduct.id,
+      branch_id: branch.id,
+      quantity: 0,
+      safety_stock: 0,
+    }));
+
+    await supabase.from('inventories').insert(inventoryRecords as any);
+  }
   
   revalidatePath('/products');
+  revalidatePath('/inventory');
   return { success: true };
 }
 
@@ -363,13 +381,31 @@ export async function createBranch(formData: FormData) {
   };
 
   // @ts-ignore
-  const { error } = await supabase.from('branches').insert(branchData);
+  const { data: newBranch, error } = await supabase.from('branches').insert(branchData).select().single() as any;
   
   if (error) {
     return { error: error.message };
   }
+
+  // 지점 생성 시 모든 제품에 재고 레코드 자동 생성
+  const { data: products } = await supabase
+    .from('products')
+    .select('id')
+    .eq('is_active', true);
+
+  if (products && products.length > 0) {
+    const inventoryRecords = products.map((product: any) => ({
+      product_id: product.id,
+      branch_id: newBranch.id,
+      quantity: 0,
+      safety_stock: 0,
+    }));
+
+    await supabase.from('inventories').insert(inventoryRecords as any);
+  }
   
   revalidatePath('/branches');
+  revalidatePath('/inventory');
   return { success: true };
 }
 
