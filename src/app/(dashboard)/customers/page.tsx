@@ -10,6 +10,7 @@ interface Customer {
   name: string;
   phone: string;
   email: string | null;
+  address: string | null;
   grade: string;
   primary_branch_id: string | null;
   health_note: string | null;
