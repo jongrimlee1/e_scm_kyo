@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { formatPhone } from '@/lib/validators';
 
@@ -68,7 +69,10 @@ const GRADE_LABELS: Record<string, string> = {
   VVIP: 'VVIP',
 };
 
-export default function CustomerDetailPage({ params }: { params: { id: string } }) {
+export default function CustomerDetailPage() {
+  const params = useParams();
+  const customerId = params.id as string;
+  
   const [customer, setCustomer] = useState<CustomerDetail | null>(null);
   const [purchases, setPurchases] = useState<PurchaseHistory[]>([]);
   const [consultations, setConsultations] = useState<Consultation[]>([]);
@@ -82,7 +86,7 @@ export default function CustomerDetailPage({ params }: { params: { id: string } 
 
   useEffect(() => {
     fetchData();
-  }, [params.id]);
+  }, [customerId]);
 
   const fetchData = async () => {
     setLoading(true);
@@ -99,18 +103,18 @@ export default function CustomerDetailPage({ params }: { params: { id: string } 
           ),
           assigned_to:users!customers_assigned_to_fkey(*)
         `)
-        .eq('id', params.id)
+        .eq('id', customerId)
         .single(),
       supabase
         .from('sales_orders')
         .select('*, branch:branches(name)')
-        .eq('customer_id', params.id)
+        .eq('customer_id', customerId)
         .order('ordered_at', { ascending: false })
         .limit(20),
       supabase
         .from('customer_consultations')
         .select('*, consulted_by:users(name)')
-        .eq('customer_id', params.id)
+        .eq('customer_id', customerId)
         .order('created_at', { ascending: false }),
       supabase.from('customer_tags').select('*').order('name'),
       supabase.from('branches').select('id, name').eq('is_active', true),
@@ -136,7 +140,7 @@ export default function CustomerDetailPage({ params }: { params: { id: string } 
   const handleAddTag = async (tagId: string) => {
     const supabase = createClient() as any;
     await supabase.from('customer_tag_map').insert({
-      customer_id: params.id,
+      customer_id: customerId,
       tag_id: tagId,
     });
     fetchData();
@@ -147,7 +151,7 @@ export default function CustomerDetailPage({ params }: { params: { id: string } 
     await supabase
       .from('customer_tag_map')
       .delete()
-      .eq('customer_id', params.id)
+      .eq('customer_id', customerId)
       .eq('tag_id', tagId);
     fetchData();
   };
@@ -157,7 +161,7 @@ export default function CustomerDetailPage({ params }: { params: { id: string } 
     await supabase
       .from('customers')
       .update({ assigned_to: userId })
-      .eq('id', params.id);
+      .eq('id', customerId);
     fetchData();
     setShowAssignModal(false);
   };
@@ -167,7 +171,7 @@ export default function CustomerDetailPage({ params }: { params: { id: string } 
     const { data: { user } } = await supabase.auth.getUser();
     
     await supabase.from('customer_consultations').insert({
-      customer_id: params.id,
+      customer_id: customerId,
       consultation_type: type,
       content: { text: content },
       consulted_by: user?.id,
