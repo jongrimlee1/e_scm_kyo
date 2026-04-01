@@ -1,6 +1,7 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { createClient } from '@/lib/supabase/client';
 
 interface CartItem {
   productId: string;
@@ -12,20 +13,28 @@ interface CartItem {
 export default function POSPage() {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [search, setSearch] = useState('');
+  const [products, setProducts] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const products = [
-    { id: '1', name: '경옥고', price: 50000, code: 'KOG-001' },
-    { id: '2', name: '한방건강차', price: 15000, code: 'HHC-001' },
-    { id: '3', name: '삼계탕세트', price: 35000, code: 'SGT-001' },
-    { id: '4', name: '황기차', price: 12000, code: 'HGC-001' },
-    { id: '5', name: '약선죽', price: 20000, code: 'YSJ-001' },
-  ];
+  useEffect(() => {
+    const fetchProducts = async () => {
+      const supabase = createClient();
+      const { data } = await supabase
+        .from('products')
+        .select('*')
+        .eq('is_active', true)
+        .order('name');
+      setProducts(data || []);
+      setLoading(false);
+    };
+    fetchProducts();
+  }, []);
 
   const filteredProducts = products.filter(p =>
     p.name.includes(search) || p.code.includes(search)
   );
 
-  const addToCart = (product: typeof products[0]) => {
+  const addToCart = (product: any) => {
     setCart(prev => {
       const existing = prev.find(item => item.productId === product.id);
       if (existing) {
@@ -62,7 +71,7 @@ export default function POSPage() {
 
   const total = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
 
-  const handlePayment = () => {
+  const handlePayment = async () => {
     if (cart.length === 0) return;
     alert('결제가 완료되었습니다.');
     setCart([]);
@@ -82,21 +91,25 @@ export default function POSPage() {
         </div>
 
         <div className="flex-1 overflow-auto">
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-            {filteredProducts.map(product => (
-              <button
-                key={product.id}
-                onClick={() => addToCart(product)}
-                className="bg-white p-4 rounded-lg shadow hover:shadow-md transition-shadow text-left"
-              >
-                <p className="font-medium text-slate-800">{product.name}</p>
-                <p className="text-xs text-slate-400 mb-2">{product.code}</p>
-                <p className="text-lg font-bold text-blue-600">
-                  {product.price.toLocaleString()}원
-                </p>
-              </button>
-            ))}
-          </div>
+          {loading ? (
+            <p className="text-center text-slate-400 py-8">로딩 중...</p>
+          ) : (
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+              {filteredProducts.map(product => (
+                <button
+                  key={product.id}
+                  onClick={() => addToCart(product)}
+                  className="bg-white p-4 rounded-lg shadow hover:shadow-md transition-shadow text-left"
+                >
+                  <p className="font-medium text-slate-800">{product.name}</p>
+                  <p className="text-xs text-slate-400 mb-2">{product.code}</p>
+                  <p className="text-lg font-bold text-blue-600">
+                    {product.price.toLocaleString()}원
+                  </p>
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 

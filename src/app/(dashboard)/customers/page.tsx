@@ -1,4 +1,13 @@
-export default function CustomersPage() {
+import { createClient } from '@/lib/supabase/server';
+
+export default async function CustomersPage() {
+  const supabase = await createClient();
+  
+  const { data: customers } = await supabase
+    .from('customers')
+    .select('*, primary_branch:branches(*)')
+    .order('created_at', { ascending: false });
+
   return (
     <div className="card">
       <div className="flex justify-between items-center mb-6">
@@ -39,11 +48,34 @@ export default function CustomersPage() {
           </tr>
         </thead>
         <tbody>
-          <tr>
-            <td colSpan={7} className="text-center text-slate-400 py-8">
-              고객 데이터를 불러오는 중...
-            </td>
-          </tr>
+          {customers?.map((customer: any) => (
+            <tr key={customer.id}>
+              <td className="font-medium">{customer.name}</td>
+              <td>{customer.phone}</td>
+              <td>
+                <span className={`badge ${
+                  customer.grade === 'VVIP' ? 'badge-warning' :
+                  customer.grade === 'VIP' ? 'badge-info' : ''
+                }`}>
+                  {customer.grade}
+                </span>
+              </td>
+              <td>{customer.primary_branch?.name || '-'}</td>
+              <td>{customer.total_points?.toLocaleString() || 0}P</td>
+              <td>-</td>
+              <td>
+                <button className="text-blue-600 hover:underline mr-2">상세</button>
+                <button className="text-blue-600 hover:underline">수정</button>
+              </td>
+            </tr>
+          ))}
+          {(!customers || customers.length === 0) && (
+            <tr>
+              <td colSpan={7} className="text-center text-slate-400 py-8">
+                등록된 고객이 없습니다
+              </td>
+            </tr>
+          )}
         </tbody>
       </table>
     </div>

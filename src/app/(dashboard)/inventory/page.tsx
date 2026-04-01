@@ -1,4 +1,13 @@
-export default function InventoryPage() {
+import { createClient } from '@/lib/supabase/server';
+
+export default async function InventoryPage() {
+  const supabase = await createClient();
+  
+  const { data: inventories } = await supabase
+    .from('inventories')
+    .select('*, branch:branches(*), product:products(*)')
+    .order('updated_at', { ascending: false });
+
   return (
     <div className="card">
       <div className="flex justify-between items-center mb-6">
@@ -42,11 +51,37 @@ export default function InventoryPage() {
           </tr>
         </thead>
         <tbody>
-          <tr>
-            <td colSpan={7} className="text-center text-slate-400 py-8">
-              재고 데이터를 불러오는 중...
-            </td>
-          </tr>
+          {inventories?.map((item: any) => {
+            const isLow = item.quantity < item.safety_stock;
+            return (
+              <tr key={item.id}>
+                <td>{item.branch?.name}</td>
+                <td className="font-mono">{item.product?.code}</td>
+                <td>{item.product?.name}</td>
+                <td className={isLow ? 'text-red-600 font-semibold' : ''}>
+                  {item.quantity}
+                </td>
+                <td>{item.safety_stock}</td>
+                <td>
+                  {isLow ? (
+                    <span className="badge badge-error">부족</span>
+                  ) : (
+                    <span className="badge badge-success">정상</span>
+                  )}
+                </td>
+                <td>
+                  <button className="text-blue-600 hover:underline mr-2">입출고</button>
+                </td>
+              </tr>
+            );
+          })}
+          {(!inventories || inventories.length === 0) && (
+            <tr>
+              <td colSpan={7} className="text-center text-slate-400 py-8">
+                재고 데이터가 없습니다
+              </td>
+            </tr>
+          )}
         </tbody>
       </table>
     </div>

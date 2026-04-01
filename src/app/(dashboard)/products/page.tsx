@@ -1,4 +1,12 @@
-export default function ProductsPage() {
+import { createClient } from '@/lib/supabase/server';
+
+export default async function ProductsPage() {
+  const supabase = await createClient();
+  const { data: products } = await supabase
+    .from('products')
+    .select('*, category:categories(*)')
+    .order('created_at', { ascending: true });
+
   return (
     <div className="card">
       <div className="flex justify-between items-center mb-6">
@@ -27,11 +35,30 @@ export default function ProductsPage() {
           </tr>
         </thead>
         <tbody>
-          <tr>
-            <td colSpan={7} className="text-center text-slate-400 py-8">
-              제품 데이터를 불러오는 중...
-            </td>
-          </tr>
+          {products?.map((product: any) => (
+            <tr key={product.id}>
+              <td className="font-mono">{product.code}</td>
+              <td>{product.name}</td>
+              <td>{product.category?.name || '-'}</td>
+              <td>{product.price?.toLocaleString()}원</td>
+              <td>{product.cost?.toLocaleString() || '-'}원</td>
+              <td>
+                <span className={product.is_active ? 'badge badge-success' : 'badge badge-error'}>
+                  {product.is_active ? '활성' : '비활성'}
+                </span>
+              </td>
+              <td>
+                <button className="text-blue-600 hover:underline mr-2">수정</button>
+              </td>
+            </tr>
+          ))}
+          {(!products || products.length === 0) && (
+            <tr>
+              <td colSpan={7} className="text-center text-slate-400 py-8">
+                등록된 제품이 없습니다
+              </td>
+            </tr>
+          )}
         </tbody>
       </table>
     </div>

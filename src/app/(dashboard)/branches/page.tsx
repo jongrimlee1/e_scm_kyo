@@ -1,4 +1,12 @@
-export default function BranchesPage() {
+import { createClient } from '@/lib/supabase/server';
+
+export default async function BranchesPage() {
+  const supabase = await createClient();
+  const { data: branches } = await supabase
+    .from('branches')
+    .select('*')
+    .order('created_at', { ascending: true });
+
   return (
     <div className="card">
       <div className="flex justify-between items-center mb-6">
@@ -19,61 +27,38 @@ export default function BranchesPage() {
           </tr>
         </thead>
         <tbody>
-          <tr>
-            <td className="font-mono">HQ</td>
-            <td>본사</td>
-            <td><span className="badge badge-info">STORE</span></td>
-            <td>02-0000-0000</td>
-            <td>경옥채 본사</td>
-            <td><span className="badge badge-success">활성</span></td>
-            <td>
-              <button className="text-blue-600 hover:underline mr-2">수정</button>
-            </td>
-          </tr>
-          <tr>
-            <td className="font-mono">PHA</td>
-            <td>한약국</td>
-            <td><span className="badge badge-info">STORE</span></td>
-            <td>02-1111-1111</td>
-            <td>한약국 주소</td>
-            <td><span className="badge badge-success">활성</span></td>
-            <td>
-              <button className="text-blue-600 hover:underline mr-2">수정</button>
-            </td>
-          </tr>
-          <tr>
-            <td className="font-mono">DS-GN</td>
-            <td>백화점 강남점</td>
-            <td><span className="badge badge-warning">DEPT_STORE</span></td>
-            <td>02-2222-2222</td>
-            <td>백화점 강남점</td>
-            <td><span className="badge badge-success">활성</span></td>
-            <td>
-              <button className="text-blue-600 hover:underline mr-2">수정</button>
-            </td>
-          </tr>
-          <tr>
-            <td className="font-mono">DS-HD</td>
-            <td>백화점 홍대점</td>
-            <td><span className="badge badge-warning">DEPT_STORE</span></td>
-            <td>02-3333-3333</td>
-            <td>백화점 홍대점</td>
-            <td><span className="badge badge-success">활성</span></td>
-            <td>
-              <button className="text-blue-600 hover:underline mr-2">수정</button>
-            </td>
-          </tr>
-          <tr>
-            <td className="font-mono">ONLINE</td>
-            <td>자사몬</td>
-            <td><span className="badge badge-info">ONLINE</span></td>
-            <td>02-4444-4444</td>
-            <td>자사몬</td>
-            <td><span className="badge badge-success">활성</span></td>
-            <td>
-              <button className="text-blue-600 hover:underline mr-2">수정</button>
-            </td>
-          </tr>
+          {branches?.map((branch: any) => (
+            <tr key={branch.id}>
+              <td className="font-mono">{branch.code}</td>
+              <td>{branch.name}</td>
+              <td>
+                <span className={`badge ${
+                  branch.channel === 'STORE' ? 'badge-info' :
+                  branch.channel === 'DEPT_STORE' ? 'badge-warning' :
+                  branch.channel === 'ONLINE' ? 'badge-success' : 'badge-error'
+                }`}>
+                  {branch.channel}
+                </span>
+              </td>
+              <td>{branch.phone || '-'}</td>
+              <td>{branch.address || '-'}</td>
+              <td>
+                <span className={branch.is_active ? 'badge badge-success' : 'badge badge-error'}>
+                  {branch.is_active ? '활성' : '비활성'}
+                </span>
+              </td>
+              <td>
+                <button className="text-blue-600 hover:underline mr-2">수정</button>
+              </td>
+            </tr>
+          ))}
+          {(!branches || branches.length === 0) && (
+            <tr>
+              <td colSpan={7} className="text-center text-slate-400 py-8">
+                등록된 지점이 없습니다
+              </td>
+            </tr>
+          )}
         </tbody>
       </table>
     </div>
