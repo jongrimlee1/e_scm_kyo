@@ -101,7 +101,30 @@ async function handleOrderCreated(
       .select('id')
       .eq('cafe24_member_id', memberId)
       .single();
-    customerId = customer?.id || null;
+    
+    if (customer) {
+      customerId = customer.id;
+    } else {
+      // 자동 고객 생성
+      const customerName = cafe24Order.orderer_name || `고객_${memberId}`;
+      const customerPhone = cafe24Order.orderer_cellphone || cafe24Order.orderer_phone || '';
+      
+      const { data: newCustomer } = await getSupabase()
+        .from('customers')
+        .insert({
+          name: customerName,
+          phone: customerPhone || `cafe24_${memberId}`,
+          cafe24_member_id: memberId,
+          grade: 'NORMAL',
+          email: cafe24Order.orderer_email || null,
+          address: cafe24Order.recipient_address || null,
+        })
+        .select('id')
+        .single();
+      
+      customerId = newCustomer?.id || null;
+      await logSyncEvent('customer_auto_created', memberId.toString(), { member_id: memberId, name: customerName }, 'success');
+    }
   }
 
   const { data: existingOrder } = await getSupabase()

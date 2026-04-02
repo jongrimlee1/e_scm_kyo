@@ -17,6 +17,10 @@ export interface Cafe24Order {
   order_status: Cafe24OrderStatus;
   member_id: string;
   customer_id: string;
+  orderer_name?: string;
+  orderer_cellphone?: string;
+  orderer_phone?: string;
+  orderer_email?: string;
   recipient_name: string;
   recipient_phone: string;
   recipient_address: string;
@@ -30,6 +34,15 @@ export interface Cafe24Order {
   payment_date: string;
   shipped_date: string | null;
   completed_date: string | null;
+}
+
+export interface Cafe24Member {
+  member_id: string;
+  member_name: string;
+  member_email?: string;
+  member_phone?: string;
+  member_cellphone?: string;
+  created_date: string;
 }
 
 export type Cafe24OrderStatus =

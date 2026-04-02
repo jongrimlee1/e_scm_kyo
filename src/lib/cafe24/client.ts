@@ -2,6 +2,7 @@ import {
   Cafe24OAuthTokens,
   Cafe24Order,
   Cafe24APIResponse,
+  Cafe24Member,
 } from './types';
 
 const CAFE24_API_VERSION = '2024-01-01';
@@ -133,6 +134,23 @@ export class Cafe24Client {
     return this.request<{ orders: Array<{ order_no: number; order_status: string; shipped_date: string | null }> }>(
       `/admin/orders/status?order_no=${orderNosStr}`
     );
+  }
+
+  async getMembers(params?: {
+    start_date?: string;
+    end_date?: string;
+    limit?: number;
+    offset?: number;
+  }): Promise<Cafe24APIResponse<{ members: Cafe24Member[]; total_count: number }>> {
+    const searchParams = new URLSearchParams();
+    if (params?.start_date) searchParams.set('start_date', params.start_date);
+    if (params?.end_date) searchParams.set('end_date', params.end_date);
+    if (params?.limit) searchParams.set('limit', params.limit.toString());
+    if (params?.offset) searchParams.set('offset', params.offset.toString());
+
+    const query = searchParams.toString();
+    const endpoint = `/admin/members${query ? `?${query}` : ''}`;
+    return this.request<{ members: Cafe24Member[]; total_count: number }>(endpoint);
   }
 
   static generateCode(orderNo: number, mallId: string): string {
