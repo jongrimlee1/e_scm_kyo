@@ -134,23 +134,24 @@ export default function CustomerDetailPage() {
         .eq('id', customerId)
         .single(),
       supabase
-        .from('sales_order_items')
+        .from('sales_orders')
         .select(`
           id,
-          quantity,
-          unit_price,
-          total_price,
-          product:products(name),
-          sales_order:sales_orders(
-            ordered_at,
-            status,
-            branch:branches(name)
+          ordered_at,
+          status,
+          branch:branches(name),
+          items:sales_order_items(
+            id,
+            quantity,
+            unit_price,
+            total_price,
+            product:products(name)
           )
         `)
-        .eq('sales_order.customer_id', customerId)
-        .gte('sales_order.ordered_at', `${start}T00:00:00`)
-        .lte('sales_order.ordered_at', `${end}T23:59:59`)
-        .order('sales_order.ordered_at', { ascending: false }),
+        .eq('customer_id', customerId)
+        .gte('ordered_at', `${start}T00:00:00`)
+        .lte('ordered_at', `${end}T23:59:59`)
+        .order('ordered_at', { ascending: false }),
       supabase
         .from('customer_consultations')
         .select('*, consulted_by:users(name)')
@@ -171,16 +172,18 @@ export default function CustomerDetailPage() {
       });
     }
 
-    const items: PurchaseItem[] = (purchasesRes.data || []).map((item: any) => ({
-      id: item.id,
-      product_name: item.product?.name || '알 수 없음',
-      quantity: item.quantity,
-      unit_price: item.unit_price,
-      total_price: item.total_price,
-      ordered_at: item.ordered_at || item.sales_order?.ordered_at,
-      branch_name: item.sales_order?.branch?.name || '-',
-      status: item.status || item.sales_order?.status,
-    }));
+    const items: PurchaseItem[] = (purchasesRes.data || []).flatMap((order: any) => 
+      (order.items || []).map((item: any) => ({
+        id: item.id,
+        product_name: item.product?.name || '알 수 없음',
+        quantity: item.quantity,
+        unit_price: item.unit_price,
+        total_price: item.total_price,
+        ordered_at: order.ordered_at,
+        branch_name: order.branch?.name || '-',
+        status: order.status,
+      }))
+    );
     setPurchaseItems(items);
 
     setConsultations((consultationsRes.data || []) as Consultation[]);
