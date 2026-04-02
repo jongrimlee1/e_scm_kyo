@@ -28,6 +28,7 @@ interface Customer {
   phone: string;
   grade: string;
   grade_point_rate?: number;
+  currentPoints?: number;
 }
 
 export default function POSPage() {
@@ -45,6 +46,8 @@ export default function POSPage() {
   const [paymentMethod, setPaymentMethod] = useState<'cash' | 'card' | 'kakao'>('cash');
   const [processing, setProcessing] = useState(false);
   const [lastScannedBarcode, setLastScannedBarcode] = useState('');
+  const [usePoints, setUsePoints] = useState(false);
+  const [pointsToUse, setPointsToUse] = useState(0);
 
   const barcodeInputRef = useRef<HTMLInputElement>(null);
   const customerInputRef = useRef<HTMLInputElement>(null);
@@ -173,11 +176,26 @@ export default function POSPage() {
     setSearch('');
   };
 
-  const selectCustomer = (customer: Customer) => {
-    setSelectedCustomer(customer);
+  const selectCustomer = async (customer: Customer) => {
+    const supabase = createClient();
+    const { data: lastHistory } = await supabase
+      .from('point_history')
+      .select('balance')
+      .eq('customer_id', customer.id)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle() as any;
+    
+    const customerWithPoints = {
+      ...customer,
+      currentPoints: lastHistory?.balance || 0,
+    };
+    setSelectedCustomer(customerWithPoints);
     setCustomerSearch('');
     setCustomerResults([]);
     setShowCustomerDropdown(false);
+    setUsePoints(false);
+    setPointsToUse(0);
   };
 
   const clearCustomer = () => {
@@ -185,10 +203,13 @@ export default function POSPage() {
     setCustomerSearch('');
     setCustomerResults([]);
     setShowCustomerDropdown(false);
+    setUsePoints(false);
+    setPointsToUse(0);
     customerInputRef.current?.focus();
   };
 
   const total = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
+  const finalAmount = usePoints && selectedCustomer ? Math.max(0, total - pointsToUse) : total;
 
   const handlePayment = async () => {
     if (cart.length === 0) return;
@@ -221,11 +242,12 @@ export default function POSPage() {
         branch_id: selectedBranch,
         customer_id: selectedCustomer?.id || null,
         ordered_by: orderedByUserId,
-        total_amount: total,
-        discount_amount: 0,
+        total_amount: finalAmount,
+        discount_amount: usePoints ? pointsToUse : 0,
         status: 'COMPLETED',
         payment_method: paymentMethod,
-        points_earned: Math.floor(total / 100),
+        points_earned: Math.floor(finalAmount * (selectedCustomer?.grade_point_rate || 1.0) / 100),
+        points_used: usePoints ? pointsToUse : 0,
         ordered_at: new Date().toISOString(),
       }).select().single();
 
@@ -277,14 +299,10 @@ export default function POSPage() {
         });
       }
 
-      // 4. 포인트 적립
+      // 4. 포인트 사용/적립
       if (selectedCustomer) {
-        console.log('DEBUG selectedCustomer:', selectedCustomer);
-        console.log('DEBUG grade_point_rate:', selectedCustomer.grade_point_rate);
         const pointRate = selectedCustomer.grade_point_rate || 1.0;
-        console.log('DEBUG pointRate:', pointRate);
-        const pointsEarned = Math.floor(total * pointRate / 100);
-        console.log('DEBUG total:', total, 'pointsEarned:', pointsEarned);
+        const pointsEarned = Math.floor(finalAmount * pointRate / 100);
         
         const { data: lastHistory } = await db
           .from('point_history')
@@ -295,16 +313,37 @@ export default function POSPage() {
           .maybeSingle();
         
         const currentPoints = lastHistory?.balance || 0;
-        const newBalance = currentPoints + pointsEarned;
         
-        await db.from('point_history').insert({
-          customer_id: selectedCustomer.id,
-          sales_order_id: saleOrderId,
-          type: 'earn',
-          points: pointsEarned,
-          balance: newBalance,
-          description: `구매 적립 (${orderNumber}) - ${pointRate}%`,
-        });
+        if (usePoints && pointsToUse > 0) {
+          const newBalanceAfterUse = currentPoints - pointsToUse;
+          await db.from('point_history').insert({
+            customer_id: selectedCustomer.id,
+            sales_order_id: saleOrderId,
+            type: 'use',
+            points: -pointsToUse,
+            balance: newBalanceAfterUse,
+            description: `포인트 사용 (${orderNumber})`,
+          });
+          const finalBalance = newBalanceAfterUse + pointsEarned;
+          await db.from('point_history').insert({
+            customer_id: selectedCustomer.id,
+            sales_order_id: saleOrderId,
+            type: 'earn',
+            points: pointsEarned,
+            balance: finalBalance,
+            description: `구매 적립 (${orderNumber}) - ${pointRate}%`,
+          });
+        } else {
+          const newBalance = currentPoints + pointsEarned;
+          await db.from('point_history').insert({
+            customer_id: selectedCustomer.id,
+            sales_order_id: saleOrderId,
+            type: 'earn',
+            points: pointsEarned,
+            balance: newBalance,
+            description: `구매 적립 (${orderNumber}) - ${pointRate}%`,
+          });
+        }
       }
 
       alert(`결제가 완료되었습니다.\n전표번호: ${orderNumber}`);
@@ -454,9 +493,17 @@ export default function POSPage() {
         </div>
 
         <div className="p-4 border-t space-y-4">
+          {usePoints && selectedCustomer && (
+            <div className="flex justify-between text-sm text-green-600">
+              <span>포인트 할인</span>
+              <span>-{pointsToUse.toLocaleString()}P</span>
+            </div>
+          )}
           <div className="flex justify-between text-lg font-bold">
             <span>합계</span>
-            <span>{total.toLocaleString()}원</span>
+            <span className={usePoints && selectedCustomer ? 'text-green-600' : ''}>
+              {finalAmount.toLocaleString()}원
+            </span>
           </div>
 
           <select
@@ -473,21 +520,60 @@ export default function POSPage() {
 
           <div className="relative">
             {selectedCustomer ? (
-              <div className="flex items-center justify-between p-3 bg-blue-50 rounded-lg border border-blue-200">
-                <div>
-                  <p className="font-medium text-blue-800">{selectedCustomer.name}</p>
-                  <p className="text-sm text-blue-600">{selectedCustomer.phone}</p>
-                  <span className={`inline-block px-2 py-0.5 text-xs rounded ${
-                    selectedCustomer.grade === 'VVIP' ? 'bg-red-100 text-red-700' :
-                    selectedCustomer.grade === 'VIP' ? 'bg-amber-100 text-amber-700' :
-                    'bg-slate-100 text-slate-600'
-                  }`}>
-                    {selectedCustomer.grade}
-                  </span>
+              <div className="space-y-2">
+                <div className="flex items-center justify-between p-3 bg-blue-50 rounded-lg border border-blue-200">
+                  <div>
+                    <p className="font-medium text-blue-800">{selectedCustomer.name}</p>
+                    <p className="text-sm text-blue-600">{selectedCustomer.phone}</p>
+                    <span className={`inline-block px-2 py-0.5 text-xs rounded mr-1 ${
+                      selectedCustomer.grade === 'VVIP' ? 'bg-red-100 text-red-700' :
+                      selectedCustomer.grade === 'VIP' ? 'bg-amber-100 text-amber-700' :
+                      'bg-slate-100 text-slate-600'
+                    }`}>
+                      {selectedCustomer.grade}
+                    </span>
+                    <span className="text-xs text-green-600 font-medium">
+                      {selectedCustomer.currentPoints?.toLocaleString() || 0}P
+                    </span>
+                  </div>
+                  <button onClick={clearCustomer} className="text-slate-400 hover:text-slate-600">
+                    ✕
+                  </button>
                 </div>
-                <button onClick={clearCustomer} className="text-slate-400 hover:text-slate-600">
-                  ✕
-                </button>
+                {selectedCustomer.currentPoints && selectedCustomer.currentPoints > 0 && (
+                  <div className="flex items-center gap-2 p-2 bg-green-50 rounded-lg border border-green-200">
+                    <input
+                      type="checkbox"
+                      id="usePoints"
+                      checked={usePoints}
+                      onChange={(e) => {
+                        setUsePoints(e.target.checked);
+                        if (e.target.checked) {
+                          setPointsToUse(Math.min(selectedCustomer.currentPoints || 0, total));
+                        } else {
+                          setPointsToUse(0);
+                        }
+                      }}
+                      className="w-4 h-4"
+                    />
+                    <label htmlFor="usePoints" className="text-sm text-green-700 flex-1">
+                      포인트 사용 (보유: {selectedCustomer.currentPoints.toLocaleString()}P)
+                    </label>
+                    {usePoints && (
+                      <input
+                        type="number"
+                        value={pointsToUse}
+                        onChange={(e) => {
+                          const val = parseInt(e.target.value) || 0;
+                          setPointsToUse(Math.min(val, Math.min(selectedCustomer.currentPoints || 0, total)));
+                        }}
+                        className="input w-24 text-right"
+                        min="0"
+                        max={Math.min(selectedCustomer.currentPoints || 0, total)}
+                      />
+                    )}
+                  </div>
+                )}
               </div>
             ) : (
               <div className="relative">
