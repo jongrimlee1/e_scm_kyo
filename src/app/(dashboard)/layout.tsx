@@ -1,11 +1,12 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { signOut } from '@/app/login/actions';
+import { createClient } from '@/lib/supabase/client';
 
-const navItems = [
+const ALL_NAV_ITEMS = [
   { href: '/', label: '대시보드', icon: '📊' },
   { href: '/pos', label: 'POS', icon: '💰' },
   { href: '/pos/manual', label: '수기 입력', icon: '✏️' },
@@ -19,6 +20,14 @@ const navItems = [
   { href: '/reports', label: '보고서', icon: '📈' },
 ];
 
+const ROLE_LABELS: Record<string, string> = {
+  SUPER_ADMIN: '본부대표',
+  HQ_OPERATOR: '본부운영자',
+  PHARMACY_STAFF: '약사',
+  BRANCH_STAFF: '지점직원',
+  EXECUTIVE: '임원',
+};
+
 export default function DashboardLayout({
   children,
 }: {
@@ -26,6 +35,44 @@ export default function DashboardLayout({
 }) {
   const pathname = usePathname();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [userName, setUserName] = useState('');
+  const [userRole, setUserRole] = useState('');
+  const [navItems, setNavItems] = useState(ALL_NAV_ITEMS);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const loadUserInfo = async () => {
+      const cookies = document.cookie.split(';').reduce((acc, cookie) => {
+        const [key, value] = cookie.trim().split('=');
+        acc[key] = decodeURIComponent(value || '');
+        return acc;
+      }, {} as Record<string, string>);
+      
+      const name = cookies.user_name || '';
+      const role = cookies.user_role || '';
+      
+      setUserName(name);
+      setUserRole(ROLE_LABELS[role] || role);
+
+      if (role) {
+        const supabase = createClient();
+        const { data: permissions } = await supabase
+          .from('screen_permissions')
+          .select('screen_path, can_view')
+          .eq('role', role)
+          .eq('can_view', true);
+
+        if (permissions) {
+          const allowedPaths = new Set(permissions.map((p: any) => p.screen_path));
+          const filtered = ALL_NAV_ITEMS.filter(item => allowedPaths.has(item.href));
+          setNavItems(filtered);
+        }
+      }
+      setLoading(false);
+    };
+
+    loadUserInfo();
+  }, []);
 
   return (
     <div className="flex min-h-screen">
@@ -49,7 +96,9 @@ export default function DashboardLayout({
             <h1 className="text-lg font-bold text-slate-800">경옥채</h1>
           </div>
           <div className="flex items-center gap-2">
-            <span className="text-sm text-slate-500 hidden sm:inline">관리자</span>
+            <span className="text-sm text-slate-500 hidden sm:inline">
+              {userName} ({userRole})
+            </span>
             <button
               onClick={() => signOut()}
               className="p-2 rounded-lg hover:bg-slate-100 text-slate-500"
@@ -87,21 +136,25 @@ export default function DashboardLayout({
           </div>
 
           <nav className="flex-1 overflow-y-auto p-3 space-y-1">
-            {navItems.map((item) => (
-              <Link
-                key={item.href}
-                href={item.href}
-                onClick={() => setSidebarOpen(false)}
-                className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors ${
-                  pathname === item.href
-                    ? 'bg-blue-600 text-white'
-                    : 'text-slate-300 hover:bg-slate-700 hover:text-white'
-                }`}
-              >
-                <span className="text-lg">{item.icon}</span>
-                <span className="text-sm font-medium">{item.label}</span>
-              </Link>
-            ))}
+            {loading ? (
+              <p className="text-slate-400 text-sm p-3">로딩중...</p>
+            ) : (
+              navItems.map((item) => (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  onClick={() => setSidebarOpen(false)}
+                  className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors ${
+                    pathname === item.href
+                      ? 'bg-blue-600 text-white'
+                      : 'text-slate-300 hover:bg-slate-700 hover:text-white'
+                  }`}
+                >
+                  <span className="text-lg">{item.icon}</span>
+                  <span className="text-sm font-medium">{item.label}</span>
+                </Link>
+              ))
+            )}
           </nav>
 
           <div className="p-3 border-t border-slate-700">
@@ -124,20 +177,24 @@ export default function DashboardLayout({
         </div>
 
         <nav className="flex-1 overflow-y-auto p-3 space-y-1">
-          {navItems.map((item) => (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors ${
-                pathname === item.href
-                  ? 'bg-blue-600 text-white'
-                  : 'text-slate-300 hover:bg-slate-700 hover:text-white'
-              }`}
-            >
-              <span className="text-lg">{item.icon}</span>
-              <span className="text-sm font-medium">{item.label}</span>
-            </Link>
-          ))}
+          {loading ? (
+            <p className="text-slate-400 text-sm p-3">로딩중...</p>
+          ) : (
+            navItems.map((item) => (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors ${
+                  pathname === item.href
+                    ? 'bg-blue-600 text-white'
+                    : 'text-slate-300 hover:bg-slate-700 hover:text-white'
+                }`}
+              >
+                <span className="text-lg">{item.icon}</span>
+                <span className="text-sm font-medium">{item.label}</span>
+              </Link>
+            ))
+          )}
         </nav>
 
         <div className="p-3 border-t border-slate-700">
@@ -160,7 +217,9 @@ export default function DashboardLayout({
               {navItems.find((item) => item.href === pathname)?.label || '페이지'}
             </h2>
             <div className="flex items-center gap-3">
-              <span className="text-sm text-slate-500">관리자</span>
+              <span className="text-sm text-slate-500">
+                {userName} ({userRole})
+              </span>
             </div>
           </div>
         </header>
