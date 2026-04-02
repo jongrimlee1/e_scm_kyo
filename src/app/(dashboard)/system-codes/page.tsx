@@ -1280,14 +1280,16 @@ function UserModal({
     setFieldErrors({});
 
     const errors: Record<string, string> = {};
-    const emailError = validators.required(formData.email, '이메일');
-    if (emailError) errors.email = emailError;
-    else {
-      const emailFormatError = validators.email(formData.email);
-      if (emailFormatError) errors.email = emailFormatError;
-    }
     const nameError = validators.required(formData.name, '이름');
     if (nameError) errors.name = nameError;
+    
+    if (!user) {
+      const passwordError = validators.required(formData.password, '비밀번호');
+      if (passwordError) errors.password = passwordError;
+      else if (formData.password.length < 6) {
+        errors.password = '비밀번호는 6자 이상이어야 합니다';
+      }
+    }
 
     if (Object.keys(errors).length > 0) {
       setFieldErrors(errors);
@@ -1344,16 +1346,33 @@ function UserModal({
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700">이메일 *</label>
+            <label className="block text-sm font-medium text-gray-700">
+              {user ? '이메일' : '이메일 (선택, 없으면 이름을 로그인 아이디로 사용)'}
+            </label>
             <input
               type="email"
               value={formData.email}
               onChange={(e) => { setFormData({ ...formData, email: e.target.value }); setFieldErrors({ ...fieldErrors, email: '' }); }}
               disabled={!!user}
+              placeholder="없으면 이름으로 로그인 가능"
               className={`mt-1 input ${fieldErrors.email ? 'border-red-500' : ''}`}
             />
             {fieldErrors.email && <p className="mt-1 text-xs text-red-500">{fieldErrors.email}</p>}
           </div>
+
+          {!user && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700">비밀번호 *</label>
+              <input
+                type="password"
+                value={formData.password}
+                onChange={(e) => { setFormData({ ...formData, password: e.target.value }); setFieldErrors({ ...fieldErrors, password: '' }); }}
+                placeholder="6자 이상"
+                className={`mt-1 input ${fieldErrors.password ? 'border-red-500' : ''}`}
+              />
+              {fieldErrors.password && <p className="mt-1 text-xs text-red-500">{fieldErrors.password}</p>}
+            </div>
+          )}
 
           <div>
             <label className="block text-sm font-medium text-gray-700">이름 *</label>

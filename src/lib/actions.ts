@@ -487,11 +487,19 @@ export async function createUser(formData: FormData) {
   const role = formData.get('role') as string;
   const branchId = formData.get('branch_id') as string;
 
-  // Create auth user
-  const { data: authData, error: authError } = await supabase.auth.admin.createUser({
-    email,
+  // 이메일 없이 ID/비밀번호로 로그인 가능하게 (pseudo-email 사용)
+  const loginId = email || name;
+  const authEmail = email ? email : `${loginId}@kyo.local`;
+
+  // Create auth user (signUp은 Admin 권한 불필요)
+  const { data: authData, error: authError } = await supabase.auth.signUp({
+    email: authEmail,
     password,
-    email_confirm: true,
+    options: {
+      data: {
+        name,
+      }
+    }
   });
 
   if (authError) {
@@ -505,7 +513,7 @@ export async function createUser(formData: FormData) {
   // Create user profile
   const { error } = await supabase.from('users').insert({
     id: authData.user.id,
-    email,
+    email: authEmail,
     password_hash: 'managed_by_auth',
     name,
     phone: phone || null,
@@ -514,8 +522,6 @@ export async function createUser(formData: FormData) {
   } as any);
 
   if (error) {
-    // Cleanup auth user if profile creation fails
-    await supabase.auth.admin.deleteUser(authData.user.id);
     return { error: error.message };
   }
   
