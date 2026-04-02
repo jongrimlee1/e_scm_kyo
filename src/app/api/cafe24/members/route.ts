@@ -10,11 +10,10 @@ export async function POST() {
     const clientId = process.env.CAFE24_CLIENT_ID;
     const clientSecret = process.env.CAFE24_CLIENT_SECRET;
 
-    if (!mallId || !clientId || !clientSecret) {
-      return NextResponse.json(
-        { success: false, error: 'Cafe24 환경변수가 설정되지 않았습니다.' },
-        { status: 500 }
-      );
+    const isDemo = !mallId || !clientId || !clientSecret;
+
+    if (isDemo) {
+      console.log('Cafe24 데모 모드: 샘플 데이터로 동기화 진행');
     }
 
     // Demo용: 샘플 회원 데이터 (실제 API 연동 시 Cafe24 API 호출로 대체)
