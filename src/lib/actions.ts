@@ -468,6 +468,7 @@ export async function createChannel(formData: FormData) {
   const code = name.replace(/\s+/g, '_').toUpperCase();
 
   const channelData = {
+    id: code,
     code,
     name,
     color: formData.get('color') as string || '#6366f1',
