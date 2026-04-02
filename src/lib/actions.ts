@@ -463,9 +463,6 @@ export async function getChannels() {
 
 export async function createChannel(formData: FormData) {
   const supabase = await createClient();
-  
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) redirect('/login');
 
   const name = formData.get('name') as string;
   const code = name.replace(/\s+/g, '_').toUpperCase();
@@ -491,12 +488,8 @@ export async function createChannel(formData: FormData) {
 
 export async function updateChannel(id: string, formData: FormData) {
   const supabase = await createClient();
-  
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) redirect('/login');
 
   const channelData = {
-    code: formData.get('code') as string,
     name: formData.get('name') as string,
     color: formData.get('color') as string || '#6366f1',
     sort_order: parseInt(formData.get('sort_order') as string) || 0,
