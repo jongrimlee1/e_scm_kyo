@@ -112,7 +112,6 @@ const ROLE_COLORS: Record<string, string> = {
 const SCREENS = [
   { path: '/', name: '대시보드' },
   { path: '/pos', name: 'POS' },
-  { path: '/pos/manual', name: '수기 입력' },
   { path: '/products', name: '제품' },
   { path: '/production', name: '생산' },
   { path: '/inventory', name: '재고' },

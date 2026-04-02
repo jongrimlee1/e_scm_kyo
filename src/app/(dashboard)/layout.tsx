@@ -9,7 +9,6 @@ import { createClient } from '@/lib/supabase/client';
 const ALL_NAV_ITEMS = [
   { href: '/', label: '대시보드', icon: '📊' },
   { href: '/pos', label: 'POS', icon: '💰' },
-  { href: '/pos/manual', label: '수기 입력', icon: '✏️' },
   { href: '/products', label: '제품', icon: '📦' },
   { href: '/production', label: '생산', icon: '🏭' },
   { href: '/inventory', label: '재고', icon: '🏪' },
