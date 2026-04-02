@@ -27,7 +27,6 @@ interface Customer {
   name: string;
   phone: string;
   grade: string;
-  total_points?: number;
   grade_point_rate?: number;
 }
 
@@ -65,7 +64,7 @@ export default function POSPage() {
       const [productsRes, branchesRes, customersRes, gradesRes] = await Promise.all([
         supabase.from('products').select('*, inventories(*)').eq('is_active', true).order('name'),
         supabase.from('branches').select('*').eq('is_active', true).order('created_at'),
-        supabase.from('customers').select('id, name, phone, grade, total_points').eq('is_active', true).order('name'),
+        supabase.from('customers').select('id, name, phone, grade').eq('is_active', true).order('name'),
         supabase.from('customer_grades').select('code, point_rate'),
       ]);
 
@@ -282,7 +281,16 @@ export default function POSPage() {
       if (selectedCustomer) {
         const pointRate = selectedCustomer.grade_point_rate || 1.0;
         const pointsEarned = Math.floor(total * pointRate / 100);
-        const currentPoints = selectedCustomer.total_points || 0;
+        
+        const { data: lastHistory } = await db
+          .from('point_history')
+          .select('balance')
+          .eq('customer_id', selectedCustomer.id)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .single();
+        
+        const currentPoints = lastHistory?.balance || 0;
         const newBalance = currentPoints + pointsEarned;
         
         await db.from('point_history').insert({
@@ -293,10 +301,6 @@ export default function POSPage() {
           balance: newBalance,
           description: `구매 적립 (${orderNumber}) - ${pointRate}%`,
         });
-        
-        await db.from('customers').update({
-          total_points: newBalance,
-        }).eq('id', selectedCustomer.id);
       }
 
       alert(`결제가 완료되었습니다.\n전표번호: ${orderNumber}`);
