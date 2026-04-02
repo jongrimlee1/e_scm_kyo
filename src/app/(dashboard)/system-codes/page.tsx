@@ -170,8 +170,12 @@ export default function SystemCodesPage() {
       const { data } = await supabase.from('channels').select('*').order('sort_order');
       setChannels((data || []) as Channel[]);
     } else if (activeTab === 'branches') {
-      const { data } = await supabase.from('branches').select('*').order('created_at', { ascending: true });
-      setBranches(data || []);
+      const [branchesRes, channelsRes] = await Promise.all([
+        supabase.from('branches').select('*').order('created_at', { ascending: true }),
+        supabase.from('channels').select('*').order('sort_order'),
+      ]);
+      setBranches(branchesRes.data || []);
+      setChannels((channelsRes.data || []) as Channel[]);
     } else if (activeTab === 'grades') {
       const { data } = await supabase.from('customer_grades').select('*').order('sort_order');
       setGrades(data || []);
@@ -444,8 +448,8 @@ export default function SystemCodesPage() {
                   <td className="font-mono">{branch.code}</td>
                   <td className="font-medium">{branch.name}</td>
                   <td>
-                    <span className={`badge ${CHANNEL_COLORS[branch.channel] || 'bg-slate-100'}`}>
-                      {CHANNEL_OPTIONS.find(c => c.value === branch.channel)?.label || branch.channel}
+                    <span className="badge bg-slate-100">
+                      {channels.find(c => c.code === branch.channel)?.name || branch.channel}
                     </span>
                   </td>
                   <td>{branch.phone || '-'}</td>
@@ -878,6 +882,7 @@ export default function SystemCodesPage() {
           {console.log('Rendering BranchModal, showBranchModal:', showBranchModal, 'editingBranch:', editingBranch)}
           <BranchModal
             branch={editingBranch}
+            channels={channels}
             onClose={() => setShowBranchModal(false)}
             onSuccess={() => { setShowBranchModal(false); fetchData(); }}
           />
@@ -1063,7 +1068,7 @@ function ChannelModal({ channel, onClose, onSuccess }: { channel: Channel | null
   );
 }
 
-function BranchModal({ branch, onClose, onSuccess }: { branch: Branch | null; onClose: () => void; onSuccess: () => void }) {
+function BranchModal({ branch, channels, onClose, onSuccess }: { branch: Branch | null; channels: Channel[]; onClose: () => void; onSuccess: () => void }) {
   const [formData, setFormData] = useState({
     name: branch?.name || '',
     channel: branch?.channel || 'STORE',
@@ -1150,8 +1155,9 @@ function BranchModal({ branch, onClose, onSuccess }: { branch: Branch | null; on
               onChange={(e) => setFormData({ ...formData, channel: e.target.value })}
               className="mt-1 input"
             >
-              {CHANNEL_OPTIONS.map((opt) => (
-                <option key={opt.value} value={opt.value}>{opt.label}</option>
+              <option value="">채널 선택</option>
+              {channels.map((ch) => (
+                <option key={ch.code} value={ch.code}>{ch.name}</option>
               ))}
             </select>
           </div>
