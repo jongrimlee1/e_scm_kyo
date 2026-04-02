@@ -53,7 +53,7 @@ export default function CustomerModal({ customer, onClose, onSuccess }: Props) {
   useEffect(() => {
     getBranches().then(res => setBranches((res.data || []).filter((b: any) => b.is_active)));
     getCustomerGrades().then(res => {
-      const active = (res.data || []).filter((g: any) => g.is_active);
+      const active: any[] = (res.data || []).filter((g: any) => g.is_active);
       setGrades(active);
       if (!formData.grade && active.length > 0) {
         setFormData(prev => ({ ...prev, grade: active[0].code }));
