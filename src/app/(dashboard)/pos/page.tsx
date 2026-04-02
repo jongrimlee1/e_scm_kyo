@@ -37,7 +37,6 @@ export default function POSPage() {
   const [branches, setBranches] = useState<any[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedBranch, setSelectedBranch] = useState('');
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [customerSearch, setCustomerSearch] = useState('');
   const [customerResults, setCustomerResults] = useState<Customer[]>([]);
@@ -45,11 +44,15 @@ export default function POSPage() {
   const [paymentMethod, setPaymentMethod] = useState<'cash' | 'card' | 'kakao'>('cash');
   const [processing, setProcessing] = useState(false);
   const [lastScannedBarcode, setLastScannedBarcode] = useState('');
-  const [userRole, setUserRole] = useState<string | null>(null);
 
   const barcodeInputRef = useRef<HTMLInputElement>(null);
   const customerInputRef = useRef<HTMLInputElement>(null);
   const productSearchRef = useRef<HTMLInputElement>(null);
+
+  const initialRole = getCookie('user_role');
+  const initialBranchId = getCookie('user_branch_id');
+  const [selectedBranch, setSelectedBranch] = useState<string>(initialBranchId || '');
+  const [userRole] = useState<string | null>(initialRole);
 
   const isBranchUser = userRole === 'BRANCH_STAFF' || userRole === 'PHARMACY_STAFF';
 
@@ -78,14 +81,8 @@ export default function POSPage() {
       });
       setProductMap(map);
 
-      const role = getCookie('user_role');
-      const userBranchId = getCookie('user_branch_id');
-      setUserRole(role);
-      
-      if (role === 'BRANCH_STAFF' || role === 'PHARMACY_STAFF') {
-        if (userBranchId) {
-          setSelectedBranch(userBranchId);
-        }
+      if (isBranchUser && initialBranchId) {
+        setSelectedBranch(initialBranchId);
       } else if (branchesData.length > 0) {
         setSelectedBranch(branchesData[0].id);
       }
@@ -95,7 +92,7 @@ export default function POSPage() {
     fetchData();
 
     barcodeInputRef.current?.focus();
-  }, []);
+  }, [isBranchUser, initialBranchId]);
 
   useEffect(() => {
     if (customerSearch.length >= 1) {
