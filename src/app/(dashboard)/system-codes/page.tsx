@@ -315,7 +315,7 @@ export default function SystemCodesPage() {
           <div className="flex justify-between items-center mb-4">
             <h3 className="font-semibold">지점 목록</h3>
             <button
-              onClick={() => { setEditingBranch(null); setShowBranchModal(true); }}
+              onClick={() => { console.log('지점 추가 clicked'); setEditingBranch(null); setShowBranchModal(true); }}
               className="btn-primary"
             >
               + 지점 추가
@@ -762,11 +762,14 @@ export default function SystemCodesPage() {
       )}
 
       {showBranchModal && (
-        <BranchModal
-          branch={editingBranch}
-          onClose={() => setShowBranchModal(false)}
-          onSuccess={() => { setShowBranchModal(false); fetchData(); }}
-        />
+        <>
+          {console.log('Rendering BranchModal, showBranchModal:', showBranchModal, 'editingBranch:', editingBranch)}
+          <BranchModal
+            branch={editingBranch}
+            onClose={() => setShowBranchModal(false)}
+            onSuccess={() => { setShowBranchModal(false); fetchData(); }}
+          />
+        </>
       )}
 
       {showGradeModal && (
