@@ -20,11 +20,19 @@ export async function getProducts(search?: string) {
 
 export async function createProduct(formData: FormData) {
   const supabase = await createClient();
-  
+
+  const name = formData.get('name') as string;
+  const nameCode = name
+    .replace(/[^a-zA-Z0-9가-힣]/g, '')
+    .substring(0, 4)
+    .toUpperCase()
+    .padEnd(4, 'X');
+  const randomCode = Math.random().toString(36).substring(2, 8).toUpperCase();
+  const code = `KYO-${nameCode}-${randomCode}`;
 
   const productData = {
-    name: formData.get('name') as string,
-    code: formData.get('code') as string,
+    name,
+    code,
     category_id: formData.get('category_id') as string || null,
     unit: formData.get('unit') as string || '개',
     price: parseInt(formData.get('price') as string),

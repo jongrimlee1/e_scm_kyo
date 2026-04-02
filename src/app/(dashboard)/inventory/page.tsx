@@ -11,16 +11,34 @@ interface Inventory {
   quantity: number;
   safety_stock: number;
   branch?: { id: string; name: string };
-  product?: { id: string; name: string; code: string };
+  product?: { id: string; name: string; code: string; barcode?: string };
+}
+
+interface Branch {
+  id: string;
+  name: string;
 }
 
 export default function InventoryPage() {
   const [inventories, setInventories] = useState<Inventory[]>([]);
+  const [branches, setBranches] = useState<Branch[]>([]);
   const [branchFilter, setBranchFilter] = useState('');
   const [search, setSearch] = useState('');
+  const [barcodeSearch, setBarcodeSearch] = useState('');
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [editInventory, setEditInventory] = useState<Inventory | null>(null);
+
+  useEffect(() => {
+    fetchBranches();
+    fetchInventory();
+  }, []);
+
+  const fetchBranches = async () => {
+    const supabase = createClient();
+    const { data } = await supabase.from('branches').select('id, name').eq('is_active', true).order('name');
+    setBranches(data || []);
+  };
 
   const fetchInventory = async () => {
     setLoading(true);
@@ -36,6 +54,10 @@ export default function InventoryPage() {
 
     if (search) {
       query = query.or(`product.name.ilike.%${search}%,product.code.ilike.%${search}%`);
+    }
+
+    if (barcodeSearch) {
+      query = query.ilike('product.barcode', `%${barcodeSearch}%`);
     }
 
     const { data } = await query;
@@ -80,24 +102,33 @@ export default function InventoryPage() {
       <div className="flex gap-4 mb-4">
         <select
           value={branchFilter}
-          onChange={(e) => setBranchFilter(e.target.value)}
+          onChange={(e) => { setBranchFilter(e.target.value); }}
           className="input w-48"
         >
           <option value="">전체 지점</option>
-          <option value="HQ">본사</option>
-          <option value="PHA">한약국</option>
-          <option value="DS-GN">백화점 강남점</option>
-          <option value="DS-HD">백화점 홍대점</option>
-          <option value="ONLINE">자사몬</option>
+          {branches.map(b => (
+            <option key={b.id} value={b.id}>{b.name}</option>
+          ))}
         </select>
         <input
           type="text"
-          placeholder="제품명 또는 코드 검색..."
+          placeholder="제품명 검색..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && fetchInventory()}
-          className="input max-w-md"
+          className="input w-48"
         />
+        <input
+          type="text"
+          placeholder="바코드 검색..."
+          value={barcodeSearch}
+          onChange={(e) => setBarcodeSearch(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && fetchInventory()}
+          className="input w-40"
+        />
+        <button onClick={() => fetchInventory()} className="btn-secondary">
+          조회
+        </button>
       </div>
 
       <table className="table">
@@ -106,6 +137,7 @@ export default function InventoryPage() {
             <th>지점</th>
             <th>제품코드</th>
             <th>제품명</th>
+            <th>바코드</th>
             <th>현재재고</th>
             <th>안전재고</th>
             <th>상태</th>
@@ -115,7 +147,7 @@ export default function InventoryPage() {
         <tbody>
           {loading ? (
             <tr>
-              <td colSpan={7} className="text-center text-slate-400 py-8">
+              <td colSpan={8} className="text-center text-slate-400 py-8">
                 로딩 중...
               </td>
             </tr>
@@ -126,6 +158,7 @@ export default function InventoryPage() {
                 <td>{item.branch?.name}</td>
                 <td className="font-mono">{item.product?.code}</td>
                 <td>{item.product?.name}</td>
+                <td className="font-mono text-sm text-slate-500">{item.product?.barcode || '-'}</td>
                 <td className={isLow ? 'text-red-600 font-semibold' : ''}>
                   {item.quantity}
                 </td>
