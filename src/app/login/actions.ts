@@ -17,8 +17,9 @@ export async function login(formData: FormData) {
       .ilike('name', email)
       .single();
     
-    if (userData?.email) {
-      email = userData.email;
+    const user = userData as { email: string } | null;
+    if (user?.email) {
+      email = user.email;
     } else {
       redirect(`/login?error=${encodeURIComponent('사용자를 찾을 수 없습니다')}`);
     }
