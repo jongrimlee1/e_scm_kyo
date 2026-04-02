@@ -1267,10 +1267,12 @@ function UserModal({
     role: user?.role || 'BRANCH_STAFF',
     branch_id: user?.branch_id || '',
     is_active: user?.is_active ?? true,
+    is_existing_auth: !!user ? false : true,
   });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const supabase = createClient();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -1285,7 +1287,7 @@ function UserModal({
       const emailFormatError = validators.email(formData.email);
       if (emailFormatError) errors.email = emailFormatError;
     }
-    if (!user) {
+    if (!user && !formData.is_existing_auth) {
       const passwordError = validators.minLength(formData.password, 6, '비밀번호');
       if (passwordError) errors.password = passwordError;
     }
@@ -1298,21 +1300,73 @@ function UserModal({
       return;
     }
 
-    const form = new FormData();
-    Object.entries(formData).forEach(([key, value]) => {
-      form.append(key, String(value));
-    });
+    try {
+      if (user) {
+        // 수정 모드
+        const db = supabase as any;
+        const { error: updateError } = await db.from('users').update({
+          name: formData.name,
+          phone: formData.phone || null,
+          role: formData.role,
+          branch_id: formData.branch_id || null,
+          is_active: formData.is_active,
+        }).eq('id', user.id);
 
-    const result = user
-      ? await updateUser(user.id, form)
-      : await createUser(form);
+        if (updateError) throw updateError;
+      } else {
+        // 추가 모드
+        const db = supabase as any;
+        if (formData.is_existing_auth) {
+          // 이미 존재하는 Auth 사용자를 employees에 연결
+          // 먼저 auth.users에서 해당 이메일의 ID를 확인
+          const { data: authUsers, error: authError } = await supabase.auth.admin.listUsers();
+          
+          if (authError) {
+            setError('Auth 사용자 조회 실패: ' + authError.message);
+            setLoading(false);
+            return;
+          }
+          
+          const authUser = authUsers?.users.find(u => u.email === formData.email);
+          
+          if (!authUser) {
+            setError('해당 이메일로 인증된 사용자가 없습니다. 먼저 Supabase Auth에서 사용자를 초대해주세요.');
+            setLoading(false);
+            return;
+          }
 
-    if (result?.error) {
-      setError(result.error);
-      setLoading(false);
-    } else {
+          const { error: insertError } = await db.from('users').insert({
+            id: authUser.id,
+            email: formData.email,
+            password_hash: 'linked_to_auth',
+            name: formData.name,
+            phone: formData.phone || null,
+            role: formData.role,
+            branch_id: formData.branch_id || null,
+            is_active: formData.is_active,
+          });
+
+          if (insertError) throw insertError;
+        } else {
+          // 새 Auth 사용자와 함께 생성
+          const form = new FormData();
+          Object.entries(formData).forEach(([key, value]) => {
+            form.append(key, String(value));
+          });
+          const result = await createUser(form);
+          if (result?.error) {
+            setError(result.error);
+            setLoading(false);
+            return;
+          }
+        }
+      }
       onSuccess();
+    } catch (err: any) {
+      setError(err?.message || '오류가 발생했습니다.');
     }
+
+    setLoading(false);
   };
 
   return (
@@ -1341,17 +1395,37 @@ function UserModal({
           </div>
 
           {!user && (
-            <div>
-              <label className="block text-sm font-medium text-gray-700">비밀번호 *</label>
-              <input
-                type="password"
-                value={formData.password}
-                onChange={(e) => { setFormData({ ...formData, password: e.target.value }); setFieldErrors({ ...fieldErrors, password: '' }); }}
-                placeholder="6자 이상"
-                className={`mt-1 input ${fieldErrors.password ? 'border-red-500' : ''}`}
-              />
-              {fieldErrors.password && <p className="mt-1 text-xs text-red-500">{fieldErrors.password}</p>}
-            </div>
+            <>
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="is_existing_auth"
+                  checked={formData.is_existing_auth}
+                  onChange={(e) => setFormData({ ...formData, is_existing_auth: e.target.checked })}
+                />
+                <label htmlFor="is_existing_auth" className="text-sm text-gray-700">
+                  이미 Supabase Auth로 인증된 사용자
+                </label>
+              </div>
+              {!formData.is_existing_auth && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">비밀번호 *</label>
+                  <input
+                    type="password"
+                    value={formData.password}
+                    onChange={(e) => { setFormData({ ...formData, password: e.target.value }); setFieldErrors({ ...fieldErrors, password: '' }); }}
+                    placeholder="6자 이상"
+                    className={`mt-1 input ${fieldErrors.password ? 'border-red-500' : ''}`}
+                  />
+                  {fieldErrors.password && <p className="mt-1 text-xs text-red-500">{fieldErrors.password}</p>}
+                </div>
+              )}
+              {formData.is_existing_auth && (
+                <p className="text-xs text-slate-500 mt-1">
+                  해당 이메일로 Auth에 등록된 사용자의 employee 레코드를 생성합니다.
+                </p>
+              )}
+            </>
           )}
 
           <div>
