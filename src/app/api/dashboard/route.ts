@@ -23,6 +23,7 @@ interface RecentOrder {
   status: string;
   created_at: string;
   cafe24_order_id: string | null;
+  items: { product_name: string; quantity: number }[];
 }
 
 interface LowInventoryItem {
@@ -55,7 +56,7 @@ export async function GET(request: NextRequest) {
 
   let recentOrdersQuery = supabase
     .from('sales_orders')
-    .select('id, order_number, channel, total_amount, status, created_at, cafe24_order_id, branch:branches(name)')
+    .select('id, order_number, channel, total_amount, status, created_at, cafe24_order_id, branch:branches(name), items:sales_order_items(product:products(name), quantity)')
     .order('created_at', { ascending: false })
     .limit(20);
 
@@ -151,6 +152,10 @@ export async function GET(request: NextRequest) {
     status: order.status,
     created_at: order.created_at,
     cafe24_order_id: order.cafe24_order_id,
+    items: (order.items || []).map((item: any) => ({
+      product_name: (item.product as any)?.name || '알 수 없음',
+      quantity: item.quantity,
+    })),
   }));
 
   const lowInventoryFormatted: LowInventoryItem[] = lowInventory.map((inv: any) => ({

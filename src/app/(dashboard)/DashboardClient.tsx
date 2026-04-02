@@ -25,6 +25,7 @@ interface RecentOrder {
   status: string;
   created_at: string;
   cafe24_order_id: string | null;
+  items: { product_name: string; quantity: number }[];
 }
 
 interface LowInventoryItem {
@@ -203,7 +204,7 @@ export default function DashboardClient() {
         </div>
 
         <div className="stat-card">
-          <p className="text-sm text-slate-500">자사몬 매출</p>
+          <p className="text-sm text-slate-500">자사몰 매출</p>
           <p className="text-2xl font-bold text-blue-600">
             {data.onlineAmount.toLocaleString()}원
           </p>
@@ -280,40 +281,44 @@ export default function DashboardClient() {
         <div className="card">
           <h3 className="font-semibold text-slate-800 mb-4">최근 주문</h3>
           <div className="space-y-2">
-            {data.recentOrders.slice(0, 6).map((order) => (
-              <div
-                key={order.id}
-                className="flex items-center justify-between py-2 border-b border-slate-100 last:border-0"
-              >
-                <div className="flex items-center gap-2">
-                  {order.cafe24_order_id && (
-                    <span className="px-1.5 py-0.5 text-xs bg-blue-100 text-blue-700 rounded">
-                      온라인
-                    </span>
-                  )}
-                  <div>
-                    <p className="text-sm font-medium text-slate-800">
-                      {order.order_number}
+            {data.recentOrders.slice(0, 6).map((order) => {
+              const productNames = order.items.map(i => i.product_name).join(', ');
+              const shortNames = productNames.length > 20 ? productNames.substring(0, 20) + '...' : productNames;
+              return (
+                <div
+                  key={order.id}
+                  className="flex items-center justify-between py-2 border-b border-slate-100 last:border-0"
+                >
+                  <div className="flex items-center gap-2">
+                    {order.cafe24_order_id && (
+                      <span className="px-1.5 py-0.5 text-xs bg-blue-100 text-blue-700 rounded">
+                        온라인
+                      </span>
+                    )}
+                    <div>
+                      <p className="text-sm font-medium text-slate-800">
+                        {shortNames || '제품명 없음'}
+                      </p>
+                      <p className="text-xs text-slate-500">
+                        {order.branch_name} · {CHANNEL_LABELS[order.channel] || order.channel}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-sm font-semibold">
+                      {order.total_amount.toLocaleString()}원
                     </p>
-                    <p className="text-xs text-slate-500">
-                      {order.branch_name} · {CHANNEL_LABELS[order.channel] || order.channel}
+                    <p className={`text-xs ${
+                      order.status === 'COMPLETED' ? 'text-green-600' :
+                      order.status === 'CANCELLED' ? 'text-red-600' :
+                      'text-slate-500'
+                    }`}>
+                      {order.status}
                     </p>
                   </div>
                 </div>
-                <div className="text-right">
-                  <p className="text-sm font-semibold">
-                    {order.total_amount.toLocaleString()}원
-                  </p>
-                  <p className={`text-xs ${
-                    order.status === 'COMPLETED' ? 'text-green-600' :
-                    order.status === 'CANCELLED' ? 'text-red-600' :
-                    'text-slate-500'
-                  }`}>
-                    {order.status}
-                  </p>
-                </div>
-              </div>
-            ))}
+              );
+            })}
             {data.recentOrders.length === 0 && (
               <p className="text-center text-slate-400 py-4">주문 내역이 없습니다</p>
             )}
