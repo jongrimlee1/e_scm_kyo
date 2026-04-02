@@ -6,6 +6,16 @@ import { useParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { formatPhone } from '@/lib/validators';
 
+function getCookie(name: string): string | null {
+  if (typeof document === 'undefined') return null;
+  const cookies = document.cookie.split(';').reduce((acc, cookie) => {
+    const [key, value] = cookie.trim().split('=');
+    acc[key] = decodeURIComponent(value || '');
+    return acc;
+  }, {} as Record<string, string>);
+  return cookies[name] || null;
+}
+
 interface CustomerDetail {
   id: string;
   name: string;
@@ -24,14 +34,15 @@ interface CustomerDetail {
   assigned_to?: { id: string; name: string } | null;
 }
 
-interface PurchaseHistory {
+interface PurchaseItem {
   id: string;
-  order_number: string;
-  total_amount: number;
-  status: string;
+  product_name: string;
+  quantity: number;
+  unit_price: number;
+  total_price: number;
   ordered_at: string;
-  branch: { name: string };
-  channel: string;
+  branch_name: string;
+  status: string;
 }
 
 interface Consultation {
@@ -70,12 +81,23 @@ const GRADE_LABELS: Record<string, string> = {
   VVIP: 'VVIP',
 };
 
+function formatDate(date: Date): string {
+  return date.toISOString().slice(0, 10);
+}
+
+function getDefaultDateRange(): { start: string; end: string } {
+  const end = new Date();
+  const start = new Date();
+  start.setDate(start.getDate() - 30);
+  return { start: formatDate(start), end: formatDate(end) };
+}
+
 export default function CustomerDetailPage() {
   const params = useParams();
   const customerId = params.id as string;
   
   const [customer, setCustomer] = useState<CustomerDetail | null>(null);
-  const [purchases, setPurchases] = useState<PurchaseHistory[]>([]);
+  const [purchaseItems, setPurchaseItems] = useState<PurchaseItem[]>([]);
   const [consultations, setConsultations] = useState<Consultation[]>([]);
   const [allTags, setAllTags] = useState<Tag[]>([]);
   const [branches, setBranches] = useState<Branch[]>([]);
@@ -85,6 +107,9 @@ export default function CustomerDetailPage() {
   const [showConsultModal, setShowConsultModal] = useState(false);
   const [showAssignModal, setShowAssignModal] = useState(false);
 
+  const [purchaseDateRange, setPurchaseDateRange] = useState(getDefaultDateRange);
+  const [consultDateRange, setConsultDateRange] = useState(getDefaultDateRange);
+
   useEffect(() => {
     fetchData();
   }, [customerId]);
@@ -92,6 +117,8 @@ export default function CustomerDetailPage() {
   const fetchData = async () => {
     setLoading(true);
     const supabase = createClient();
+
+    const { start, end } = purchaseDateRange;
 
     const [customerRes, purchasesRes, consultationsRes, tagsRes, branchesRes, usersRes] = await Promise.all([
       supabase
@@ -107,15 +134,31 @@ export default function CustomerDetailPage() {
         .eq('id', customerId)
         .single(),
       supabase
-        .from('sales_orders')
-        .select('*, branch:branches(name)')
+        .from('sales_order_items')
+        .select(`
+          id,
+          quantity,
+          unit_price,
+          total_price,
+          ordered_at,
+          status,
+          sales_order:-sales_orders(
+            ordered_at,
+            status,
+            branch:branches(name)
+          ),
+          product:products(name)
+        `)
         .eq('customer_id', customerId)
-        .order('ordered_at', { ascending: false })
-        .limit(20),
+        .gte('ordered_at', `${start}T00:00:00`)
+        .lte('ordered_at', `${end}T23:59:59`)
+        .order('ordered_at', { ascending: false }),
       supabase
         .from('customer_consultations')
         .select('*, consulted_by:users(name)')
         .eq('customer_id', customerId)
+        .gte('created_at', `${consultDateRange.start}T00:00:00`)
+        .lte('created_at', `${consultDateRange.end}T23:59:59`)
         .order('created_at', { ascending: false }),
       supabase.from('customer_tags').select('*').order('name'),
       supabase.from('branches').select('id, name').eq('is_active', true),
@@ -130,7 +173,18 @@ export default function CustomerDetailPage() {
       });
     }
 
-    setPurchases((purchasesRes.data || []) as PurchaseHistory[]);
+    const items: PurchaseItem[] = (purchasesRes.data || []).map((item: any) => ({
+      id: item.id,
+      product_name: item.product?.name || '알 수 없음',
+      quantity: item.quantity,
+      unit_price: item.unit_price,
+      total_price: item.total_price,
+      ordered_at: item.ordered_at || item.sales_order?.ordered_at,
+      branch_name: item.sales_order?.branch?.name || '-',
+      status: item.status || item.sales_order?.status,
+    }));
+    setPurchaseItems(items);
+
     setConsultations((consultationsRes.data || []) as Consultation[]);
     setAllTags((tagsRes.data || []) as Tag[]);
     setBranches((branchesRes.data || []) as Branch[]);
@@ -169,13 +223,13 @@ export default function CustomerDetailPage() {
 
   const handleAddConsultation = async (type: string, content: string) => {
     const supabase = createClient() as any;
-    const { data: { user } } = await supabase.auth.getUser();
+    const userId = getCookie('user_id');
     
     await supabase.from('customer_consultations').insert({
       customer_id: customerId,
       consultation_type: type,
       content: { text: content },
-      consulted_by: user?.id,
+      consulted_by: userId || null,
     });
     
     fetchData();
@@ -183,7 +237,21 @@ export default function CustomerDetailPage() {
   };
 
   const getTotalPurchaseAmount = () => {
-    return purchases.reduce((sum, p) => sum + p.total_amount, 0);
+    return purchaseItems.reduce((sum, p) => sum + p.total_price, 0);
+  };
+
+  const handleDateFilterChange = (type: 'purchase' | 'consult', field: 'start' | 'end', value: string) => {
+    if (type === 'purchase') {
+      const newRange = { ...purchaseDateRange, [field]: value };
+      setPurchaseDateRange(newRange);
+    } else {
+      const newRange = { ...consultDateRange, [field]: value };
+      setConsultDateRange(newRange);
+    }
+  };
+
+  const applyDateFilter = (type: 'purchase' | 'consult') => {
+    fetchData();
   };
 
   if (loading) {
@@ -324,7 +392,7 @@ export default function CustomerDetailPage() {
             <dl className="space-y-2 text-sm">
               <div className="flex justify-between">
                 <dt className="text-slate-500">총 구매 횟수</dt>
-                <dd>{purchases.length}회</dd>
+                <dd>{purchaseItems.length}회</dd>
               </div>
               <div className="flex justify-between">
                 <dt className="text-slate-500">총 구매 금액</dt>
@@ -354,7 +422,7 @@ export default function CustomerDetailPage() {
                   : 'border-transparent text-slate-500'
               }`}
             >
-              구매 이력 ({purchases.length})
+              구매 이력 ({purchaseItems.length})
             </button>
             <button
               onClick={() => setActiveTab('consultations')}
@@ -369,41 +437,100 @@ export default function CustomerDetailPage() {
           </div>
 
           {activeTab === 'purchases' && (
-            <div className="card">
-              {purchases.length > 0 ? (
-                <div className="space-y-3">
-                  {purchases.map(purchase => (
-                    <div
-                      key={purchase.id}
-                      className="flex justify-between items-center p-3 bg-slate-50 rounded-lg"
-                    >
-                      <div>
-                        <p className="font-medium">{purchase.order_number}</p>
-                        <p className="text-sm text-slate-500">
-                          {purchase.branch.name} · {new Date(purchase.ordered_at).toLocaleDateString('ko-KR')}
-                        </p>
-                      </div>
-                      <div className="text-right">
-                        <p className="font-semibold">{purchase.total_amount.toLocaleString()}원</p>
-                        <span className={`badge ${
-                          purchase.status === 'COMPLETED' ? 'badge-success' :
-                          purchase.status === 'CANCELLED' ? 'badge-error' : 'badge-warning'
-                        }`}>
-                          {purchase.status === 'COMPLETED' ? '완료' :
-                           purchase.status === 'CANCELLED' ? '취소' : purchase.status}
-                        </span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-center text-slate-400 py-8">구매 이력이 없습니다</p>
-              )}
+            <div className="space-y-4">
+              <div className="flex gap-2 items-center flex-wrap">
+                <input
+                  type="date"
+                  value={purchaseDateRange.start}
+                  onChange={(e) => handleDateFilterChange('purchase', 'start', e.target.value)}
+                  className="input w-36"
+                />
+                <span className="text-slate-400">~</span>
+                <input
+                  type="date"
+                  value={purchaseDateRange.end}
+                  onChange={(e) => handleDateFilterChange('purchase', 'end', e.target.value)}
+                  className="input w-36"
+                />
+                <button onClick={() => applyDateFilter('purchase')} className="btn-secondary">
+                  조회
+                </button>
+                <button 
+                  onClick={() => {
+                    const range = getDefaultDateRange();
+                    setPurchaseDateRange(range);
+                    setTimeout(() => fetchData(), 0);
+                  }}
+                  className="text-sm text-slate-500 hover:text-slate-700"
+                >
+                  초기화
+                </button>
+              </div>
+
+              <div className="card">
+                {purchaseItems.length > 0 ? (
+                  <table className="table">
+                    <thead>
+                      <tr>
+                        <th>날짜</th>
+                        <th>제품</th>
+                        <th>수량</th>
+                        <th>단가</th>
+                        <th>금액</th>
+                        <th>지점</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {purchaseItems.map(item => (
+                        <tr key={item.id}>
+                          <td className="text-sm">{new Date(item.ordered_at).toLocaleDateString('ko-KR')}</td>
+                          <td className="font-medium">{item.product_name}</td>
+                          <td>{item.quantity}</td>
+                          <td>{item.unit_price.toLocaleString()}원</td>
+                          <td className="font-semibold">{item.total_price.toLocaleString()}원</td>
+                          <td className="text-slate-500">{item.branch_name}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                ) : (
+                  <p className="text-center text-slate-400 py-8">구매 이력이 없습니다</p>
+                )}
+              </div>
             </div>
           )}
 
           {activeTab === 'consultations' && (
             <div className="space-y-4">
+              <div className="flex gap-2 items-center flex-wrap">
+                <input
+                  type="date"
+                  value={consultDateRange.start}
+                  onChange={(e) => handleDateFilterChange('consult', 'start', e.target.value)}
+                  className="input w-36"
+                />
+                <span className="text-slate-400">~</span>
+                <input
+                  type="date"
+                  value={consultDateRange.end}
+                  onChange={(e) => handleDateFilterChange('consult', 'end', e.target.value)}
+                  className="input w-36"
+                />
+                <button onClick={() => applyDateFilter('consult')} className="btn-secondary">
+                  조회
+                </button>
+                <button 
+                  onClick={() => {
+                    const range = getDefaultDateRange();
+                    setConsultDateRange(range);
+                    setTimeout(() => fetchData(), 0);
+                  }}
+                  className="text-sm text-slate-500 hover:text-slate-700"
+                >
+                  초기화
+                </button>
+              </div>
+
               <button
                 onClick={() => setShowConsultModal(true)}
                 className="btn-primary"
