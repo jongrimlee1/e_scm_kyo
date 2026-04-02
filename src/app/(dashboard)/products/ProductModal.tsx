@@ -217,7 +217,15 @@ export default function ProductModal({ product, onClose, onSuccess }: Props) {
                 type="text"
                 value={formData.barcode || ''}
                 onChange={(e) => setFormData({ ...formData, barcode: e.target.value || null })}
-                className="mt-1 input"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    document.getElementById('product-submit')?.click();
+                  }
+                }}
+                placeholder="스캐너로 바코드 입력 가능"
+                className="mt-1 input font-mono"
+                autoFocus={!product}
               />
             </div>
           </div>
@@ -237,6 +245,7 @@ export default function ProductModal({ product, onClose, onSuccess }: Props) {
           <div className="flex gap-2 pt-4">
             <button
               type="submit"
+              id="product-submit"
               disabled={loading}
               className="flex-1 btn-primary"
             >
