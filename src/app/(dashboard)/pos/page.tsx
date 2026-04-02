@@ -183,7 +183,8 @@ export default function POSPage() {
       // 1. 먼저 판매 전표 생성 (재고 차감 전에)
       const today = new Date().toISOString().slice(0, 10).replace(/-/g, '');
       const branchCode = branches.find(b => b.id === selectedBranch)?.code || 'ETC';
-      orderNumber = `SA-${branchCode}-${today}-${Date.now().toString().slice(-4)}`;
+      const randomSuffix = Math.random().toString(36).substring(2, 6).toUpperCase();
+      orderNumber = `SA-${branchCode}-${today}-${randomSuffix}`;
 
       const { data: { user } } = await supabase.auth.getUser();
 
