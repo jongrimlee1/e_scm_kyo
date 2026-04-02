@@ -467,9 +467,12 @@ export async function createChannel(formData: FormData) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect('/login');
 
+  const name = formData.get('name') as string;
+  const code = name.toUpperCase().replace(/[^A-Z0-9]/g, '_');
+
   const channelData = {
-    code: formData.get('code') as string,
-    name: formData.get('name') as string,
+    code,
+    name,
     color: formData.get('color') as string || '#6366f1',
     sort_order: parseInt(formData.get('sort_order') as string) || 0,
     is_active: true,

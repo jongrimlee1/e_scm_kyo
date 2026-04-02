@@ -931,7 +931,6 @@ export default function SystemCodesPage() {
 
 function ChannelModal({ channel, onClose, onSuccess }: { channel: Channel | null; onClose: () => void; onSuccess: () => void }) {
   const [formData, setFormData] = useState({
-    code: channel?.code || '',
     name: channel?.name || '',
     color: channel?.color || '#6366f1',
     sort_order: channel?.sort_order || 0,
@@ -948,8 +947,6 @@ function ChannelModal({ channel, onClose, onSuccess }: { channel: Channel | null
     setFieldErrors({});
 
     const errors: Record<string, string> = {};
-    const codeError = validators.required(formData.code, '채널코드');
-    if (codeError) errors.code = codeError;
     const nameError = validators.required(formData.name, '채널명');
     if (nameError) errors.name = nameError;
 
@@ -991,17 +988,12 @@ function ChannelModal({ channel, onClose, onSuccess }: { channel: Channel | null
         )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700">채널코드 *</label>
-            <input
-              type="text"
-              value={formData.code}
-              onChange={(e) => { setFormData({ ...formData, code: e.target.value.toUpperCase() }); setFieldErrors({ ...fieldErrors, code: '' }); }}
-              placeholder="STORE"
-              className={`mt-1 input ${fieldErrors.code ? 'border-red-500' : ''}`}
-            />
-            {fieldErrors.code && <p className="mt-1 text-xs text-red-500">{fieldErrors.code}</p>}
-          </div>
+          {channel && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700">코드</label>
+              <input type="text" value={channel.code} disabled className="mt-1 input bg-slate-100 text-slate-500" />
+            </div>
+          )}
 
           <div>
             <label className="block text-sm font-medium text-gray-700">채널명 *</label>
