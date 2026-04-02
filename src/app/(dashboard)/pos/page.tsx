@@ -288,7 +288,7 @@ export default function POSPage() {
           .eq('customer_id', selectedCustomer.id)
           .order('created_at', { ascending: false })
           .limit(1)
-          .single();
+          .maybeSingle();
         
         const currentPoints = lastHistory?.balance || 0;
         const newBalance = currentPoints + pointsEarned;
