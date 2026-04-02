@@ -123,7 +123,7 @@ export default function CustomerDetailPage() {
 
     const { start, end } = purchaseDateRange;
 
-    const [customerRes, purchasesRes, consultationsRes, tagsRes, branchesRes, usersRes] = await Promise.all([
+    const [customerRes, purchasesRes, consultationsRes, tagsRes, branchesRes, usersRes, pointRes] = await Promise.all([
       supabase
         .from('customers')
         .select(`
@@ -166,12 +166,20 @@ export default function CustomerDetailPage() {
       supabase.from('customer_tags').select('*').order('name'),
       supabase.from('branches').select('id, name').eq('is_active', true),
       supabase.from('users').select('id, name').eq('is_active', true),
+      supabase
+        .from('point_history')
+        .select('balance')
+        .eq('customer_id', customerId)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle(),
     ]) as any;
 
     if (customerRes.data) {
       const c = customerRes.data as any;
       setCustomer({
         ...c,
+        total_points: pointRes?.data?.balance || 0,
         tags: c.tags?.map((t: any) => t.tag).filter(Boolean) || [],
       });
     }
