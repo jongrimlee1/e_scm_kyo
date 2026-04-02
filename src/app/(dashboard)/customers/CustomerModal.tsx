@@ -1,8 +1,15 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { createCustomer, updateCustomer, deleteCustomer, getBranches, getCustomerGrades } from '@/lib/actions';
+import { createCustomer, updateCustomer, deleteCustomer } from '@/lib/actions';
+import { createClient } from '@/lib/supabase/client';
 import { validators, formatPhone } from '@/lib/validators';
+
+declare global {
+  interface Window {
+    daum: any;
+  }
+}
 
 interface Customer {
   id?: string;
@@ -34,13 +41,13 @@ export default function CustomerModal({ customer, onClose, onSuccess }: Props) {
   const [grades, setGrades] = useState<any[]>([]);
 
   const [addr1, addr2] = splitAddress(customer?.address ?? null);
-  const [formData, setFormData] = useState<Omit<Customer, 'address'>>({
+  const [formData, setFormData] = useState({
     name: customer?.name || '',
     phone: customer?.phone || '',
-    email: customer?.email || null,
+    email: customer?.email || '',
     grade: customer?.grade || '',
-    primary_branch_id: customer?.primary_branch_id || null,
-    health_note: customer?.health_note || null,
+    primary_branch_id: customer?.primary_branch_id || '',
+    health_note: customer?.health_note || '',
     is_active: customer?.is_active ?? true,
   });
   const [address1, setAddress1] = useState(addr1);
@@ -51,15 +58,38 @@ export default function CustomerModal({ customer, onClose, onSuccess }: Props) {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    getBranches().then(res => setBranches((res.data || []).filter((b: any) => b.is_active)));
-    getCustomerGrades().then(res => {
-      const active: any[] = (res.data || []).filter((g: any) => g.is_active);
-      setGrades(active);
-      if (!formData.grade && active.length > 0) {
-        setFormData(prev => ({ ...prev, grade: active[0].code }));
+    const supabase = createClient();
+
+    supabase.from('branches').select('id, name').eq('is_active', true).order('created_at').then(({ data }) => {
+      setBranches(data || []);
+    });
+
+    supabase.from('customer_grades').select('code, name').eq('is_active', true).order('sort_order').then(({ data }) => {
+      const list = data || [];
+      setGrades(list);
+      if (!formData.grade && list.length > 0) {
+        setFormData(prev => ({ ...prev, grade: list[0].code }));
       }
     });
+
+    // Daum 우편번호 스크립트 로드
+    if (!window.daum) {
+      const script = document.createElement('script');
+      script.src = 'https://t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js';
+      document.head.appendChild(script);
+    }
   }, []);
+
+  const openPostcode = () => {
+    if (!window.daum) return;
+    new window.daum.Postcode({
+      oncomplete: (data: any) => {
+        const road = data.roadAddress || data.jibunAddress;
+        setAddress1(road);
+        setAddress2('');
+      },
+    }).open();
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -72,8 +102,10 @@ export default function CustomerModal({ customer, onClose, onSuccess }: Props) {
     if (nameError) errors.name = nameError;
     const phoneError = validators.phone(formData.phone);
     if (phoneError) errors.phone = phoneError;
-    const emailError = validators.email(formData.email);
-    if (emailError) errors.email = emailError;
+    if (formData.email) {
+      const emailError = validators.email(formData.email);
+      if (emailError) errors.email = emailError;
+    }
 
     if (Object.keys(errors).length > 0) {
       setFieldErrors(errors);
@@ -86,10 +118,14 @@ export default function CustomerModal({ customer, onClose, onSuccess }: Props) {
       : address1.trim() || null;
 
     const form = new FormData();
-    Object.entries(formData).forEach(([key, value]) => {
-      form.append(key, String(value ?? ''));
-    });
-    if (combinedAddress) form.set('address', combinedAddress);
+    form.append('name', formData.name);
+    form.append('phone', formData.phone);
+    form.append('email', formData.email);
+    form.append('grade', formData.grade);
+    form.append('primary_branch_id', formData.primary_branch_id);
+    form.append('health_note', formData.health_note);
+    form.append('is_active', String(formData.is_active));
+    if (combinedAddress) form.append('address', combinedAddress);
 
     const result = customer?.id
       ? await updateCustomer(customer.id, form)
@@ -155,8 +191,8 @@ export default function CustomerModal({ customer, onClose, onSuccess }: Props) {
             <label className="block text-sm font-medium text-gray-700">이메일</label>
             <input
               type="email"
-              value={formData.email || ''}
-              onChange={(e) => { setFormData({ ...formData, email: e.target.value || null }); setFieldErrors({ ...fieldErrors, email: '' }); }}
+              value={formData.email}
+              onChange={(e) => { setFormData({ ...formData, email: e.target.value }); setFieldErrors({ ...fieldErrors, email: '' }); }}
               className={`mt-1 input ${fieldErrors.email ? 'border-red-500' : ''}`}
               placeholder="example@email.com"
             />
@@ -165,19 +201,29 @@ export default function CustomerModal({ customer, onClose, onSuccess }: Props) {
 
           <div>
             <label className="block text-sm font-medium text-gray-700">주소</label>
-            <input
-              type="text"
-              value={address1}
-              onChange={(e) => setAddress1(e.target.value)}
-              className="mt-1 input"
-              placeholder="도로명 주소 (예: 서울특별시 강남구 테헤란로 123)"
-            />
+            <div className="mt-1 flex gap-2">
+              <input
+                type="text"
+                value={address1}
+                readOnly
+                className="input flex-1 bg-slate-50 cursor-pointer"
+                placeholder="주소 검색 버튼을 눌러주세요"
+                onClick={openPostcode}
+              />
+              <button
+                type="button"
+                onClick={openPostcode}
+                className="btn-secondary whitespace-nowrap"
+              >
+                주소 검색
+              </button>
+            </div>
             <input
               type="text"
               value={address2}
               onChange={(e) => setAddress2(e.target.value)}
               className="mt-2 input"
-              placeholder="상세 주소 (예: 101동 202호)"
+              placeholder="상세 주소 (동/호수 등)"
             />
           </div>
 
@@ -197,8 +243,8 @@ export default function CustomerModal({ customer, onClose, onSuccess }: Props) {
             <div>
               <label className="block text-sm font-medium text-gray-700">담당 지점</label>
               <select
-                value={formData.primary_branch_id || ''}
-                onChange={(e) => setFormData({ ...formData, primary_branch_id: e.target.value || null })}
+                value={formData.primary_branch_id}
+                onChange={(e) => setFormData({ ...formData, primary_branch_id: e.target.value })}
                 className="mt-1 input"
               >
                 <option value="">선택 안 함</option>
@@ -212,8 +258,8 @@ export default function CustomerModal({ customer, onClose, onSuccess }: Props) {
           <div>
             <label className="block text-sm font-medium text-gray-700">건강 메모</label>
             <textarea
-              value={formData.health_note || ''}
-              onChange={(e) => setFormData({ ...formData, health_note: e.target.value || null })}
+              value={formData.health_note}
+              onChange={(e) => setFormData({ ...formData, health_note: e.target.value })}
               rows={3}
               className="mt-1 input"
               placeholder="건강 관련 특이사항..."
