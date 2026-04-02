@@ -3,6 +3,7 @@
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { createHash } from 'crypto';
+import { cookies } from 'next/headers';
 
 function hashPassword(password: string): string {
   return createHash('sha256').update(password).digest('hex');
@@ -17,11 +18,11 @@ export async function login(formData: FormData) {
   // login_id로 사용자 찾기
   const { data: userData } = await supabase
     .from('users')
-    .select('id, login_id, password_hash')
+    .select('id, login_id, password_hash, name, role')
     .eq('login_id', loginId)
     .single();
   
-  const user = userData as { id: string; login_id: string; password_hash: string } | null;
+  const user = userData as { id: string; login_id: string; password_hash: string; name: string; role: string } | null;
   
   if (!user) {
     redirect(`/login?error=${encodeURIComponent('존재하지 않는 아이디입니다')}`);
@@ -33,23 +34,48 @@ export async function login(formData: FormData) {
     redirect(`/login?error=${encodeURIComponent('비밀번호가 일치하지 않습니다')}`);
   }
 
-  // Supabase Auth 세션 생성 (간단히 아이디@kyo.local 형식 사용)
-  const { error } = await supabase.auth.signInWithPassword({
-    email: `${loginId}@kyo.local`,
-    password: password
+  // 자체 세션 토큰 생성 (간단히 user ID를 쿠키에 저장)
+  const sessionToken = createHash('sha256').update(`${user.id}-${Date.now()}`).digest('hex');
+  
+  // 쿠키에 세션 저장
+  const cookieStore = await cookies();
+  cookieStore.set('session_token', sessionToken, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax',
+    maxAge: 60 * 60 * 24 * 7, // 1주일
+    path: '/',
   });
-
-  if (error) {
-    // 자체 검증 통과했으면 자체 세션 처리 후 진행
-    // (임시: 쿠키에 사용자 ID 저장하는 등의 처리 필요)
-    redirect('/');
-  }
+  cookieStore.set('user_id', user.id, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax',
+    maxAge: 60 * 60 * 24 * 7,
+    path: '/',
+  });
+  cookieStore.set('user_name', user.name, {
+    httpOnly: false, // 클라이언트에서 읽기 가능
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax',
+    maxAge: 60 * 60 * 24 * 7,
+    path: '/',
+  });
+  cookieStore.set('user_role', user.role, {
+    httpOnly: false,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax',
+    maxAge: 60 * 60 * 24 * 7,
+    path: '/',
+  });
 
   redirect('/');
 }
 
 export async function signOut() {
-  const supabase = await createClient();
-  await supabase.auth.signOut();
+  const cookieStore = await cookies();
+  cookieStore.delete('session_token');
+  cookieStore.delete('user_id');
+  cookieStore.delete('user_name');
+  cookieStore.delete('user_role');
   redirect('/login');
 }
