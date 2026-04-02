@@ -1,0 +1,19 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(node -e \"console.log\\(process.version\\)\")",
+      "Bash(npm install:*)",
+      "Bash(node doc/prd_v2_gen.mjs)",
+      "Bash(ls -lh C:/dev/e_sem_kyo/doc/*.pdf)",
+      "WebSearch",
+      "WebFetch(domain:developers.cafe24.com)",
+      "WebFetch(domain:techchat.tosspayments.com)",
+      "WebFetch(domain:www.tosspayments.com)",
+      "WebFetch(domain:tossplace.com)",
+      "WebFetch(domain:partners.cafe24.com)",
+      "WebFetch(domain:docs.tossplace.com)",
+      "Bash(node doc/api_integration_gen.mjs)",
+      "Bash(ls -lh doc/*.pdf)"
+    ]
+  }
+}
