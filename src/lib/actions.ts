@@ -21,8 +21,6 @@ export async function getProducts(search?: string) {
 export async function createProduct(formData: FormData) {
   const supabase = await createClient();
   
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) redirect('/login');
 
   const productData = {
     name: formData.get('name') as string,
@@ -66,8 +64,6 @@ export async function createProduct(formData: FormData) {
 export async function updateProduct(id: string, formData: FormData) {
   const supabase = await createClient();
   
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) redirect('/login');
 
   const productData = {
     name: formData.get('name') as string,
@@ -94,8 +90,6 @@ export async function updateProduct(id: string, formData: FormData) {
 export async function deleteProduct(id: string) {
   const supabase = await createClient();
   
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) redirect('/login');
 
   const { error } = await supabase.from('products').delete().eq('id', id);
   
@@ -128,8 +122,6 @@ export async function getCustomers(search?: string, grade?: string) {
 export async function createCustomer(formData: FormData) {
   const supabase = await createClient();
   
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) redirect('/login');
 
   const customerData = {
     name: formData.get('name') as string,
@@ -155,8 +147,6 @@ export async function createCustomer(formData: FormData) {
 export async function updateCustomer(id: string, formData: FormData) {
   const supabase = await createClient();
   
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) redirect('/login');
 
   const customerData = {
     name: formData.get('name') as string,
@@ -183,8 +173,6 @@ export async function updateCustomer(id: string, formData: FormData) {
 export async function deleteCustomer(id: string) {
   const supabase = await createClient();
   
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) redirect('/login');
 
   const { error } = await supabase.from('customers').delete().eq('id', id);
   
@@ -220,8 +208,6 @@ export async function getInventory(branchId?: string, search?: string) {
 export async function adjustInventory(formData: FormData) {
   const supabase = await createClient();
   
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) redirect('/login');
 
   const branchId = formData.get('branch_id') as string;
   const productId = formData.get('product_id') as string;
@@ -292,8 +278,6 @@ export async function getCategoriesAll() {
 export async function createCategory(formData: FormData) {
   const supabase = await createClient();
   
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) redirect('/login');
 
   const categoryData = {
     name: formData.get('name') as string,
@@ -316,8 +300,6 @@ export async function createCategory(formData: FormData) {
 export async function updateCategory(id: string, formData: FormData) {
   const supabase = await createClient();
   
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) redirect('/login');
 
   const categoryData = {
     name: formData.get('name') as string,
@@ -340,8 +322,6 @@ export async function updateCategory(id: string, formData: FormData) {
 export async function deleteCategory(id: string) {
   const supabase = await createClient();
   
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) redirect('/login');
 
   const { error } = await supabase.from('categories').delete().eq('id', id);
   
@@ -370,9 +350,6 @@ export async function getBranchesAll() {
 
 export async function createBranch(formData: FormData) {
   const supabase = await createClient();
-  
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) redirect('/login');
 
   const branchData = {
     name: formData.get('name') as string,
@@ -413,13 +390,9 @@ export async function createBranch(formData: FormData) {
 
 export async function updateBranch(id: string, formData: FormData) {
   const supabase = await createClient();
-  
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) redirect('/login');
 
   const branchData = {
     name: formData.get('name') as string,
-    code: formData.get('code') as string,
     channel: formData.get('channel') as string,
     address: formData.get('address') as string || null,
     phone: formData.get('phone') as string || null,
@@ -439,9 +412,6 @@ export async function updateBranch(id: string, formData: FormData) {
 
 export async function deleteBranch(id: string) {
   const supabase = await createClient();
-  
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) redirect('/login');
 
   const { error } = await supabase.from('branches').delete().eq('id', id);
   
@@ -510,9 +480,6 @@ export async function updateChannel(id: string, formData: FormData) {
 
 export async function deleteChannel(id: string) {
   const supabase = await createClient();
-  
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) redirect('/login');
 
   // 해당 채널을 사용하는 지점이 있는지 확인
   const { data: branches } = await supabase
@@ -558,9 +525,6 @@ export async function getUsersByBranch(branchId: string) {
 export async function createUser(formData: FormData) {
   const supabase = await createClient();
   
-  const { data: { user: authUser } } = await supabase.auth.getUser();
-  if (!authUser) redirect('/login');
-
   const loginId = formData.get('login_id') as string;
   const password = formData.get('password') as string;
   const name = formData.get('name') as string;
@@ -616,9 +580,6 @@ export async function createUser(formData: FormData) {
 
 export async function updateUser(id: string, formData: FormData) {
   const supabase = await createClient();
-  
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) redirect('/login');
 
   const userData: Record<string, any> = {
     name: formData.get('name') as string,
@@ -649,9 +610,6 @@ export async function updateUser(id: string, formData: FormData) {
 
 export async function deleteUser(id: string) {
   const supabase = await createClient();
-  
-  const { data: { user: authUser } } = await supabase.auth.getUser();
-  if (!authUser) redirect('/login');
 
   // Delete auth user first
   const { error: authError } = await supabase.auth.admin.deleteUser(id);
@@ -678,8 +636,6 @@ export async function getCustomerGrades() {
 export async function createCustomerGrade(formData: FormData) {
   const supabase = await createClient();
   
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) redirect('/login');
 
   const gradeData = {
     code: formData.get('code') as string,
@@ -704,8 +660,6 @@ export async function createCustomerGrade(formData: FormData) {
 export async function updateCustomerGrade(id: string, formData: FormData) {
   const supabase = await createClient();
   
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) redirect('/login');
 
   const gradeData = {
     code: formData.get('code') as string,
@@ -731,8 +685,6 @@ export async function updateCustomerGrade(id: string, formData: FormData) {
 export async function deleteCustomerGrade(id: string) {
   const supabase = await createClient();
   
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) redirect('/login');
 
   const { error } = await supabase.from('customer_grades').delete().eq('id', id);
   
@@ -755,8 +707,6 @@ export async function getCustomerTags() {
 export async function createCustomerTag(formData: FormData) {
   const supabase = await createClient();
   
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) redirect('/login');
 
   const tagData = {
     name: formData.get('name') as string,
@@ -778,8 +728,6 @@ export async function createCustomerTag(formData: FormData) {
 export async function updateCustomerTag(id: string, formData: FormData) {
   const supabase = await createClient();
   
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) redirect('/login');
 
   const tagData = {
     name: formData.get('name') as string,
@@ -801,8 +749,6 @@ export async function updateCustomerTag(id: string, formData: FormData) {
 export async function deleteCustomerTag(id: string) {
   const supabase = await createClient();
   
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) redirect('/login');
 
   const { error } = await supabase.from('customer_tags').delete().eq('id', id);
   
