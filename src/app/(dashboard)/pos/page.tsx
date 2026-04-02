@@ -68,7 +68,7 @@ export default function POSPage() {
         supabase.from('customer_grades').select('code, point_rate'),
       ]);
 
-      const gradesMap = new Map((gradesRes.data || []).map((g: any) => [g.code, g.point_rate]));
+      const gradesMap = new Map((gradesRes.data || []).map((g: any) => [g.code, parseFloat(g.point_rate) || 1.0]));
 
       const branchesData = (branchesRes.data || []) as any[];
       const productsData = (productsRes.data || []) as any[];
