@@ -99,14 +99,37 @@ const ROLE_COLORS: Record<string, string> = {
   EXECUTIVE: 'bg-amber-100 text-amber-700',
 };
 
+const SCREENS = [
+  { path: '/', name: '대시보드' },
+  { path: '/pos', name: 'POS' },
+  { path: '/pos/manual', name: '수기 입력' },
+  { path: '/products', name: '제품' },
+  { path: '/production', name: '생산' },
+  { path: '/inventory', name: '재고' },
+  { path: '/customers', name: '고객' },
+  { path: '/notifications', name: '알림' },
+  { path: '/system-codes', name: '코드 관리' },
+  { path: '/branches', name: '지점' },
+  { path: '/reports', name: '보고서' },
+];
+
+interface ScreenPermission {
+  id: string;
+  role: string;
+  screen_path: string;
+  can_view: boolean;
+  can_edit: boolean;
+}
+
 export default function SystemCodesPage() {
-  const [activeTab, setActiveTab] = useState<'branches' | 'grades' | 'tags' | 'categories' | 'staff' | 'templates'>('branches');
+  const [activeTab, setActiveTab] = useState<'branches' | 'grades' | 'tags' | 'categories' | 'staff' | 'templates' | 'permissions'>('branches');
   const [branches, setBranches] = useState<Branch[]>([]);
   const [grades, setGrades] = useState<CustomerGrade[]>([]);
   const [tags, setTags] = useState<CustomerTag[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [templates, setTemplates] = useState<NotificationTemplate[]>([]);
+  const [permissions, setPermissions] = useState<ScreenPermission[]>([]);
   const [loading, setLoading] = useState(true);
 
   const [showBranchModal, setShowBranchModal] = useState(false);
@@ -148,6 +171,9 @@ export default function SystemCodesPage() {
     } else if (activeTab === 'templates') {
       const { data } = await supabase.from('notification_templates').select('*').order('created_at', { ascending: false });
       setTemplates((data || []) as NotificationTemplate[]);
+    } else if (activeTab === 'permissions') {
+      const { data } = await supabase.from('screen_permissions').select('*').order('role', { ascending: true });
+      setPermissions((data || []) as ScreenPermission[]);
     }
 
     setLoading(false);
@@ -180,6 +206,28 @@ export default function SystemCodesPage() {
   const handleDeleteUser = async (id: string) => {
     if (!confirm('정말 삭제하시겠습니까?')) return;
     await deleteUser(id);
+    fetchData();
+  };
+
+  const handlePermissionChange = async (role: string, screenPath: string, field: 'can_view' | 'can_edit', value: boolean) => {
+    const supabase = createClient();
+    const db = supabase as any;
+
+    const existing = permissions.find(
+      p => p.role === role && p.screen_path === screenPath
+    );
+
+    if (existing) {
+      await db.from('screen_permissions').update({ [field]: value }).eq('id', existing.id);
+    } else {
+      await db.from('screen_permissions').insert({
+        role,
+        screen_path: screenPath,
+        can_view: field === 'can_view' ? value : false,
+        can_edit: field === 'can_edit' ? value : false,
+      });
+    }
+
     fetchData();
   };
 
@@ -249,6 +297,16 @@ export default function SystemCodesPage() {
           }`}
         >
           알림톡 템플릿
+        </button>
+        <button
+          onClick={() => setActiveTab('permissions')}
+          className={`px-4 py-2 font-medium border-b-2 -mb-px transition-colors ${
+            activeTab === 'permissions'
+              ? 'border-blue-500 text-blue-600'
+              : 'border-transparent text-slate-500 hover:text-slate-700'
+          }`}
+        >
+          권한 관리
         </button>
       </div>
 
@@ -641,6 +699,63 @@ export default function SystemCodesPage() {
                   </td>
                 </tr>
               )}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {activeTab === 'permissions' && (
+        <div className="card">
+          <div className="mb-4">
+            <h3 className="font-semibold">역할별 화면 권한</h3>
+            <p className="text-sm text-slate-500 mt-1">
+              각 역할이 접근할 수 있는 화면을 설정합니다
+            </p>
+          </div>
+
+          <table className="table">
+            <thead>
+              <tr>
+                <th>화면</th>
+                {ROLE_OPTIONS.map(role => (
+                  <th key={role.value} className="text-center">
+                    <div className="flex flex-col items-center">
+                      <span>{role.label}</span>
+                      <span className="text-xs font-normal text-slate-400">{role.value}</span>
+                    </div>
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {SCREENS.map(screen => (
+                <tr key={screen.path}>
+                  <td className="font-medium">
+                    <div>
+                      <p>{screen.name}</p>
+                      <p className="text-xs text-slate-400">{screen.path}</p>
+                    </div>
+                  </td>
+                  {ROLE_OPTIONS.map(role => {
+                    const perm = permissions.find(
+                      p => p.role === role.value && p.screen_path === screen.path
+                    );
+                    return (
+                      <td key={role.value} className="text-center">
+                        <div className="flex flex-col items-center gap-1">
+                          <input
+                            type="checkbox"
+                            checked={perm?.can_view ?? false}
+                            onChange={(e) => handlePermissionChange(role.value, screen.path, 'can_view', e.target.checked)}
+                            className="rounded"
+                          />
+                          <span className="text-xs text-slate-400">보기</span>
+                        </div>
+                      </td>
+                    );
+                  })}
+                </tr>
+              ))}
             </tbody>
           </table>
         </div>
