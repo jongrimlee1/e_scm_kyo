@@ -176,39 +176,14 @@ export default function POSPage() {
     const supabase = createClient();
     const db = supabase as any;
 
+    let saleOrderId = null;
+    let orderNumber = '';
+
     try {
-      for (const item of cart) {
-        const { data: inventory } = await supabase
-          .from('inventories')
-          .select('id, quantity')
-          .eq('branch_id', selectedBranch)
-          .eq('product_id', item.productId)
-          .single();
-
-        const inv = inventory as any;
-        if (!inv || inv.quantity < item.quantity) {
-          alert(`"${item.name}" 재고가 부족합니다.`);
-          setProcessing(false);
-          return;
-        }
-
-        await db.from('inventories').update({
-          quantity: inv.quantity - item.quantity,
-        }).eq('id', inv.id);
-
-        await db.from('inventory_movements').insert({
-          branch_id: selectedBranch,
-          product_id: item.productId,
-          movement_type: 'OUT',
-          quantity: item.quantity,
-          reference_type: 'POS_SALE',
-          memo: null,
-        });
-      }
-
+      // 1. 먼저 판매 전표 생성 (재고 차감 전에)
       const today = new Date().toISOString().slice(0, 10).replace(/-/g, '');
       const branchCode = branches.find(b => b.id === selectedBranch)?.code || 'ETC';
-      const orderNumber = `SA-${branchCode}-${today}-${Date.now().toString().slice(-4)}`;
+      orderNumber = `SA-${branchCode}-${today}-${Date.now().toString().slice(-4)}`;
 
       const { data: { user } } = await supabase.auth.getUser();
 
@@ -227,10 +202,12 @@ export default function POSPage() {
       }).select().single();
 
       if (saleError) throw saleError;
+      saleOrderId = (saleOrder as any).id;
 
+      // 2. 판매 항목 저장
       for (const item of cart) {
         await db.from('sales_order_items').insert({
-          sales_order_id: (saleOrder as any).id,
+          sales_order_id: saleOrderId,
           product_id: item.productId,
           quantity: item.quantity,
           unit_price: item.price,
@@ -239,11 +216,45 @@ export default function POSPage() {
         });
       }
 
+      // 3. 재고 확인 및 차감 (판매 전표 생성 후에)
+      for (const item of cart) {
+        const { data: inventory } = await supabase
+          .from('inventories')
+          .select('id, quantity')
+          .eq('branch_id', selectedBranch)
+          .eq('product_id', item.productId)
+          .single();
+
+        const inv = inventory as any;
+        if (!inv || inv.quantity < item.quantity) {
+          // 재고 부족 -刚才创建的销售记录需要删除
+          await db.from('sales_orders').delete().eq('id', saleOrderId);
+          alert(`"${item.name}" 재고가 부족합니다. 결제가 취소되었습니다.`);
+          setProcessing(false);
+          return;
+        }
+
+        await db.from('inventories').update({
+          quantity: inv.quantity - item.quantity,
+        }).eq('id', inv.id);
+
+        await db.from('inventory_movements').insert({
+          branch_id: selectedBranch,
+          product_id: item.productId,
+          movement_type: 'OUT',
+          quantity: item.quantity,
+          reference_id: saleOrderId,
+          reference_type: 'POS_SALE',
+          memo: null,
+        });
+      }
+
+      // 4. 포인트 적립
       if (selectedCustomer) {
         const pointsEarned = Math.floor(total / 100);
         await db.from('point_history').insert({
           customer_id: selectedCustomer.id,
-          sales_order_id: (saleOrder as any).id,
+          sales_order_id: saleOrderId,
           type: 'earn',
           points: pointsEarned,
           balance: 0,
@@ -258,7 +269,11 @@ export default function POSPage() {
       barcodeInputRef.current?.focus();
     } catch (err: any) {
       console.error(err);
-      alert('결제 처리 중 오류가 발생했습니다.');
+      // 에러 발생 시刚才创建的销售记录也删除
+      if (saleOrderId) {
+        await db.from('sales_orders').delete().eq('id', saleOrderId);
+      }
+      alert('결제 처리 중 오류가 발생했습니다. 다시 시도해주세요.');
     }
 
     setProcessing(false);
