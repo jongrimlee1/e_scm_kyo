@@ -52,16 +52,26 @@ export default function InventoryPage() {
       query = query.eq('branch_id', branchFilter);
     }
 
+    const { data } = await query;
+    
+    let filteredData = data || [];
+    
     if (search) {
-      query = query.or(`product.name.ilike.%${search}%,product.code.ilike.%${search}%`);
+      const searchLower = search.toLowerCase();
+      filteredData = filteredData.filter((item: any) =>
+        item.product?.name?.toLowerCase().includes(searchLower) ||
+        item.product?.code?.toLowerCase().includes(searchLower)
+      );
     }
 
     if (barcodeSearch) {
-      query = query.ilike('product.barcode', `%${barcodeSearch}%`);
+      const barcodeLower = barcodeSearch.toLowerCase();
+      filteredData = filteredData.filter((item: any) =>
+        item.product?.barcode?.toLowerCase().includes(barcodeLower)
+      );
     }
 
-    const { data } = await query;
-    setInventories(data || []);
+    setInventories(filteredData);
     setLoading(false);
   };
 
