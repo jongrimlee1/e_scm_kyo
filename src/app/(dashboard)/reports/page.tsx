@@ -2,8 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import { createClient } from '@/lib/supabase/client';
-import { jsPDF } from 'jspdf';
-import 'jspdf-autotable';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 function getCookie(name: string): string | null {
   if (typeof document === 'undefined') return null;
@@ -269,14 +269,17 @@ export default function ReportsPage() {
   const downloadPDF = () => {
     const doc = new jsPDF();
     const pageWidth = doc.internal.pageSize.getWidth();
+    let yPos = 20;
 
     doc.setFontSize(18);
     doc.setFont('helvetica', 'bold');
-    doc.text('경옥채 매출 보고서', pageWidth / 2, 20, { align: 'center' });
+    doc.text('경옥채 매출 보고서', pageWidth / 2, yPos, { align: 'center' });
+    yPos += 12;
 
     doc.setFontSize(10);
     doc.setFont('helvetica', 'normal');
-    doc.text(`기간: ${startDate} ~ ${endDate}`, pageWidth / 2, 28, { align: 'center' });
+    doc.text(`기간: ${startDate} ~ ${endDate}`, pageWidth / 2, yPos, { align: 'center' });
+    yPos += 8;
 
     const filterText: string[] = [];
     if (filterBranch) {
@@ -287,15 +290,16 @@ export default function ReportsPage() {
       filterText.push(`채널: ${CHANNEL_NAMES[filterChannel] || filterChannel}`);
     }
     if (filterText.length > 0) {
-      doc.text(filterText.join(' | '), pageWidth / 2, 34, { align: 'center' });
+      doc.text(filterText.join(' | '), pageWidth / 2, yPos, { align: 'center' });
+      yPos += 8;
     }
 
+    yPos += 5;
     doc.setFontSize(14);
     doc.setFont('helvetica', 'bold');
-    doc.text('매출 요약', 14, 48);
+    doc.text('매출 요약', 14, yPos);
+    yPos += 8;
 
-    doc.setFontSize(10);
-    doc.setFont('helvetica', 'normal');
     const summaryData = [
       ['총 매출 (정상가)', `${salesData.totalAmount.toLocaleString()}원`],
       ['포인트 할인', `-${salesData.totalDiscount.toLocaleString()}원`],
@@ -306,8 +310,8 @@ export default function ReportsPage() {
       ['사용 포인트', `-${salesData.totalPointsUsed.toLocaleString()}P`],
     ];
 
-    (doc as any).autoTable({
-      startY: 52,
+    autoTable(doc, {
+      startY: yPos,
       head: [['항목', '금액']],
       body: summaryData,
       theme: 'striped',
@@ -316,11 +320,12 @@ export default function ReportsPage() {
       margin: { left: 14, right: 14 },
     });
 
-    let yPos = (doc as any).lastAutoTable.finalY + 15;
+    yPos = (doc as any).lastAutoTable.finalY + 15;
 
     doc.setFontSize(14);
     doc.setFont('helvetica', 'bold');
     doc.text('채널별 매출', 14, yPos);
+    yPos += 8;
 
     const channelData = channelSales.map(ch => [
       ch.channelName,
@@ -329,8 +334,7 @@ export default function ReportsPage() {
       `${ch.percentage}%`,
     ]);
 
-    yPos += 8;
-    (doc as any).autoTable({
+    autoTable(doc, {
       startY: yPos,
       head: [['채널', '매출액', '주문수', '비율']],
       body: channelData,
@@ -345,6 +349,7 @@ export default function ReportsPage() {
     doc.setFontSize(14);
     doc.setFont('helvetica', 'bold');
     doc.text('지점별 매출', 14, yPos);
+    yPos += 8;
 
     const branchData = branchSales.map(br => [
       br.branchName,
@@ -353,8 +358,7 @@ export default function ReportsPage() {
       `${br.percentage}%`,
     ]);
 
-    yPos += 8;
-    (doc as any).autoTable({
+    autoTable(doc, {
       startY: yPos,
       head: [['지점', '매출액', '주문수', '비율']],
       body: branchData,
@@ -369,6 +373,7 @@ export default function ReportsPage() {
     doc.setFontSize(14);
     doc.setFont('helvetica', 'bold');
     doc.text('인기 제품 (판매금액 기준)', 14, yPos);
+    yPos += 8;
 
     const productData = productSales.map((p, i) => [
       `${i + 1}`,
@@ -377,8 +382,7 @@ export default function ReportsPage() {
       `${p.amount.toLocaleString()}원`,
     ]);
 
-    yPos += 8;
-    (doc as any).autoTable({
+    autoTable(doc, {
       startY: yPos,
       head: [['순위', '제품명', '판매수량', '판매금액']],
       body: productData,
