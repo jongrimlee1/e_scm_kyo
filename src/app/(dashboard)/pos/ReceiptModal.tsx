@@ -20,6 +20,8 @@ interface Props {
   pointsUsed: number;
   pointsEarned: number;
   paymentMethod: string;
+  cashReceived?: number;
+  change?: number;
   orderedAt: string;
   onClose: () => void;
 }
@@ -33,7 +35,7 @@ const PAYMENT_LABELS: Record<string, string> = {
 export default function ReceiptModal({
   orderNumber, branchName, customerName,
   items, totalAmount, discountAmount, finalAmount,
-  pointsUsed, pointsEarned, paymentMethod, orderedAt,
+  pointsUsed, pointsEarned, paymentMethod, cashReceived, change, orderedAt,
   onClose,
 }: Props) {
   const printRef = useRef<HTMLDivElement>(null);
@@ -164,6 +166,18 @@ export default function ReceiptModal({
               <span>결제수단</span>
               <span>{PAYMENT_LABELS[paymentMethod] || paymentMethod}</span>
             </div>
+            {cashReceived !== undefined && cashReceived > 0 && (
+              <div className="flex justify-between text-slate-500 text-xs">
+                <span>받은금액</span>
+                <span>{cashReceived.toLocaleString()}원</span>
+              </div>
+            )}
+            {change !== undefined && change > 0 && (
+              <div className="flex justify-between font-semibold text-xs">
+                <span>거스름돈</span>
+                <span>{change.toLocaleString()}원</span>
+              </div>
+            )}
           </div>
 
           {pointsEarned > 0 && (

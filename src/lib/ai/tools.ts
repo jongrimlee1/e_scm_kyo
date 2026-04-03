@@ -495,6 +495,39 @@ export const AGENT_TOOLS: MiniMaxTool[] = [
   {
     type: 'function',
     function: {
+      name: 'update_product',
+      description: '제품의 판매가, 원가, 이름, 단위를 수정합니다.',
+      parameters: {
+        type: 'object',
+        properties: {
+          product_name: { type: 'string', description: '수정할 제품명 키워드' },
+          new_price: { type: 'number', description: '새 판매가 (원). 변경 불필요시 생략.' },
+          new_cost: { type: 'number', description: '새 원가 (원). 변경 불필요시 생략.' },
+          new_name: { type: 'string', description: '새 제품명. 변경 불필요시 생략.' },
+          new_unit: { type: 'string', description: '새 단위. 변경 불필요시 생략.' },
+        },
+        required: ['product_name'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'bulk_update_product_costs',
+      description: '전체 또는 특정 제품의 원가를 판매가 대비 비율로 일괄 업데이트합니다. "원가를 판매가의 50%로 설정해줘" 같은 요청에 사용.',
+      parameters: {
+        type: 'object',
+        properties: {
+          cost_ratio: { type: 'number', description: '판매가 대비 원가 비율 (0~1). 예: 0.5 = 50%' },
+          product_name: { type: 'string', description: '특정 제품만 적용 시 제품명 키워드. 생략 시 전체 제품.' },
+        },
+        required: ['cost_ratio'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
       name: 'bulk_send_sms',
       description: '특정 등급 또는 전체 고객에게 동일한 SMS를 일괄 발송합니다. 프로모션, 공지사항 등에 사용.',
       parameters: {
@@ -601,6 +634,8 @@ export const WRITE_TOOLS = new Set([
   'bulk_send_sms',
   'create_and_confirm_purchase_order',
   'replenish_low_stock',
+  'update_product',
+  'bulk_update_product_costs',
 ]);
 
 // ─── Shared Helpers ──────────────────────────────────────────────────────────
@@ -669,6 +704,8 @@ export async function executeTool(toolName: string, args: Record<string, any>, s
       case 'replenish_low_stock':      return execReplenishLowStock(sb, args as any);
       case 'get_top_products':         return execGetTopProducts(sb, args as any);
       case 'compare_sales':            return execCompareSales(sb, args as any);
+      case 'update_product':           return execUpdateProduct(sb, args as any);
+      case 'bulk_update_product_costs':return execBulkUpdateProductCosts(sb, args as any);
       default: return JSON.stringify({ error: `알 수 없는 도구: ${toolName}` });
     }
   } catch (e: any) {
@@ -1930,5 +1967,61 @@ async function execCompareSales(sb: any, args: {
     },
     증감: `${diff >= 0 ? '+' : ''}${diff.toLocaleString()}원 (${diff >= 0 ? '+' : ''}${diffPct}%)`,
     분석: diff > 0 ? '기간1이 기간2보다 매출이 높습니다.' : diff < 0 ? '기간1이 기간2보다 매출이 낮습니다.' : '두 기간 매출이 동일합니다.',
+  });
+}
+
+// ── 제품 수정 ─────────────────────────────────────────────────────────────────
+
+async function execUpdateProduct(sb: any, args: {
+  product_name: string; new_price?: number; new_cost?: number; new_name?: string; new_unit?: string;
+}): Promise<string> {
+  const product = await findProduct(sb, args.product_name);
+  if (!product) return JSON.stringify({ error: `제품 "${args.product_name}" 없음` });
+
+  const updates: Record<string, any> = {};
+  if (args.new_price !== undefined) updates.price = args.new_price;
+  if (args.new_cost !== undefined) updates.cost = args.new_cost;
+  if (args.new_name !== undefined) updates.name = args.new_name;
+  if (args.new_unit !== undefined) updates.unit = args.new_unit;
+
+  if (Object.keys(updates).length === 0) return JSON.stringify({ error: '변경할 내용이 없습니다.' });
+
+  const { error } = await sb.from('products').update(updates).eq('id', product.id);
+  if (error) return JSON.stringify({ error: error.message });
+
+  const changeLines = Object.entries(updates).map(([k, v]) => {
+    const labels: Record<string, string> = { price: '판매가', cost: '원가', name: '제품명', unit: '단위' };
+    return `${labels[k] || k}: ${typeof v === 'number' ? v.toLocaleString() + '원' : v}`;
+  }).join(', ');
+
+  return JSON.stringify({ 성공: true, 메시지: `${product.name} 수정 완료`, 변경내용: changeLines });
+}
+
+async function execBulkUpdateProductCosts(sb: any, args: { cost_ratio: number; product_name?: string }): Promise<string> {
+  let q = sb.from('products').select('id, name, price').eq('is_active', true);
+  if (args.product_name) q = q.ilike('name', `%${args.product_name}%`);
+  const { data: products, error } = await q;
+  if (error) return JSON.stringify({ error: error.message });
+  if (!products?.length) return JSON.stringify({ error: '대상 제품이 없습니다.' });
+
+  let successCount = 0;
+  const details: string[] = [];
+
+  for (const p of products as any[]) {
+    const newCost = Math.round(p.price * args.cost_ratio);
+    const { error: upErr } = await sb.from('products').update({ cost: newCost }).eq('id', p.id);
+    if (!upErr) {
+      successCount++;
+      details.push(`${p.name}: ${newCost.toLocaleString()}원`);
+    }
+  }
+
+  return JSON.stringify({
+    성공: true,
+    메시지: `${successCount}개 제품 원가 일괄 업데이트 완료`,
+    기준: `판매가의 ${Math.round(args.cost_ratio * 100)}%`,
+    처리건수: successCount,
+    상세: details.slice(0, 10),
+    안내: details.length > 10 ? `외 ${details.length - 10}개` : undefined,
   });
 }

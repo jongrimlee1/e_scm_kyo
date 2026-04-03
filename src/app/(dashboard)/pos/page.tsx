@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import RefundModal from './RefundModal';
 import ReceiptModal from './ReceiptModal';
@@ -16,14 +16,17 @@ function getCookie(name: string): string | null {
 }
 
 const GRADE_LABELS: Record<string, string> = { VVIP: 'VVIP', VIP: 'VIP', NORMAL: '일반' };
-const PAYMENT_LABELS: Record<string, string> = { cash: '현금', card: '카드', kakao: '카카오페이' };
+const GRADE_BADGE: Record<string, string> = {
+  VVIP: 'bg-red-100 text-red-700',
+  VIP: 'bg-amber-100 text-amber-700',
+  NORMAL: 'bg-slate-100 text-slate-600',
+};
 
 interface CartItem {
   productId: string;
   name: string;
   price: number;
   quantity: number;
-  inventory?: any;
   barcode?: string;
 }
 
@@ -41,6 +44,8 @@ export default function POSPage() {
   const [search, setSearch] = useState('');
   const [products, setProducts] = useState<any[]>([]);
   const [productMap, setProductMap] = useState<Map<string, any>>(new Map());
+  // inventory map: `${branchId}_${productId}` → quantity
+  const [inventoryMap, setInventoryMap] = useState<Map<string, number>>(new Map());
   const [branches, setBranches] = useState<any[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(true);
@@ -49,16 +54,23 @@ export default function POSPage() {
   const [customerResults, setCustomerResults] = useState<Customer[]>([]);
   const [showCustomerDropdown, setShowCustomerDropdown] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<'cash' | 'card' | 'kakao'>('cash');
+  const [cashReceived, setCashReceived] = useState('');
   const [processing, setProcessing] = useState(false);
-  const [lastScannedBarcode, setLastScannedBarcode] = useState('');
   const [usePoints, setUsePoints] = useState(false);
   const [pointsToUse, setPointsToUse] = useState(0);
   const [showRefundModal, setShowRefundModal] = useState(false);
   const [receiptData, setReceiptData] = useState<any>(null);
+  const [editingQtyId, setEditingQtyId] = useState<string | null>(null);
+  const [editingQtyVal, setEditingQtyVal] = useState('');
+  // quick register
+  const [showQuickReg, setShowQuickReg] = useState(false);
+  const [quickName, setQuickName] = useState('');
+  const [quickPhone, setQuickPhone] = useState('');
+  const [quickRegLoading, setQuickRegLoading] = useState(false);
 
-  const barcodeInputRef = useRef<HTMLInputElement>(null);
+  const searchRef = useRef<HTMLInputElement>(null);
   const customerInputRef = useRef<HTMLInputElement>(null);
-  const productSearchRef = useRef<HTMLInputElement>(null);
+  const editingQtyRef = useRef<HTMLInputElement>(null);
 
   const initialRole = getCookie('user_role');
   const initialBranchId = getCookie('user_branch_id');
@@ -67,54 +79,61 @@ export default function POSPage() {
 
   const isBranchUser = userRole === 'BRANCH_STAFF' || userRole === 'PHARMACY_STAFF';
 
+  // ── 초기 데이터 로드 ───────────────────────────────────────────────────────
   useEffect(() => {
     const fetchData = async () => {
       const supabase = createClient();
-      
-      const [productsRes, branchesRes, customersRes, gradesRes] = await Promise.all([
-        supabase.from('products').select('*, inventories(*)').eq('is_active', true).order('name'),
+
+      const [productsRes, branchesRes, customersRes, gradesRes, invRes] = await Promise.all([
+        supabase.from('products').select('id, name, code, barcode, price, unit').eq('is_active', true).order('name'),
         supabase.from('branches').select('*').eq('is_active', true).order('created_at'),
         supabase.from('customers').select('id, name, phone, grade').eq('is_active', true).order('name'),
         supabase.from('customer_grades').select('code, point_rate'),
+        supabase.from('inventories').select('product_id, branch_id, quantity'),
       ]);
 
       const gradesMap = new Map((gradesRes.data || []).map((g: any) => [g.code, parseFloat(g.point_rate) || 1.0]));
-
       const branchesData = (branchesRes.data || []) as any[];
       const productsData = (productsRes.data || []) as any[];
-      const customersData = (customersRes.data || []).map((c: any) => ({
-        ...c,
-        grade_point_rate: gradesMap.get(c.grade) || 1.0,
-      }));
+
+      // 재고 맵 구성
+      const invMap = new Map<string, number>();
+      for (const inv of (invRes.data || []) as any[]) {
+        invMap.set(`${inv.branch_id}_${inv.product_id}`, inv.quantity);
+      }
 
       setProducts(productsData);
       setBranches(branchesData);
-      setCustomers(customersData);
+      setInventoryMap(invMap);
+      setCustomers((customersRes.data || []).map((c: any) => ({
+        ...c,
+        grade_point_rate: gradesMap.get(c.grade) || 1.0,
+      })));
 
-      const map = new Map<string, any>();
+      const pMap = new Map<string, any>();
       productsData.forEach(p => {
-        if (p.barcode) map.set(p.barcode, p);
-        map.set(p.code, p);
+        if (p.barcode) pMap.set(p.barcode, p);
+        pMap.set(p.code, p);
       });
-      setProductMap(map);
+      setProductMap(pMap);
 
       if (isBranchUser && initialBranchId) {
         setSelectedBranch(initialBranchId);
       } else if (branchesData.length > 0) {
         setSelectedBranch(branchesData[0].id);
       }
-      
+
       setLoading(false);
     };
     fetchData();
-
-    barcodeInputRef.current?.focus();
+    searchRef.current?.focus();
   }, [isBranchUser, initialBranchId]);
 
+  // ── 고객 검색 ─────────────────────────────────────────────────────────────
   useEffect(() => {
     if (customerSearch.length >= 1) {
       const q = customerSearch.toLowerCase();
-      const results = customers.filter(c => 
+      const results = customers.filter(c =>
         c.name.toLowerCase().includes(q) ||
         c.phone.replace(/-/g, '').includes(q.replace(/-/g, ''))
       );
@@ -123,84 +142,82 @@ export default function POSPage() {
     } else {
       setCustomerResults([]);
       setShowCustomerDropdown(false);
+      setShowQuickReg(false);
     }
   }, [customerSearch, customers]);
 
+  // ── 수량 편집 포커스 ───────────────────────────────────────────────────────
+  useEffect(() => {
+    if (editingQtyId) editingQtyRef.current?.focus();
+  }, [editingQtyId]);
+
+  // ── 제품 필터 ─────────────────────────────────────────────────────────────
   const filteredProducts = products.filter(p =>
     p.name.includes(search) || p.code.includes(search)
   );
 
+  const getStock = useCallback((productId: string) =>
+    inventoryMap.get(`${selectedBranch}_${productId}`) ?? null,
+  [inventoryMap, selectedBranch]);
+
+  // ── 장바구니 ──────────────────────────────────────────────────────────────
   const addToCart = (product: any) => {
+    const stock = getStock(product.id);
+    const inCartQty = cart.find(i => i.productId === product.id)?.quantity ?? 0;
+    if (stock !== null && inCartQty + 1 > stock) {
+      alert(`"${product.name}" 재고 부족 (현재 ${stock}개)`);
+      return;
+    }
     setCart(prev => {
       const existing = prev.find(item => item.productId === product.id);
       if (existing) {
         return prev.map(item =>
-          item.productId === product.id
-            ? { ...item, quantity: item.quantity + 1 }
-            : item
+          item.productId === product.id ? { ...item, quantity: item.quantity + 1 } : item
         );
       }
-      return [...prev, {
-        productId: product.id,
-        name: product.name,
-        price: product.price,
-        quantity: 1,
-        inventory: product.inventories,
-        barcode: product.barcode,
-      }];
+      return [...prev, { productId: product.id, name: product.name, price: product.price, quantity: 1, barcode: product.barcode }];
     });
     setSearch('');
-    productSearchRef.current?.focus();
+    searchRef.current?.focus();
   };
 
-  const removeFromCart = (productId: string) => {
-    setCart(prev => prev.filter(item => item.productId !== productId));
-  };
+  const removeFromCart = (productId: string) => setCart(prev => prev.filter(i => i.productId !== productId));
 
   const updateQuantity = (productId: string, quantity: number) => {
-    if (quantity <= 0) {
-      removeFromCart(productId);
+    if (quantity <= 0) { removeFromCart(productId); return; }
+    const stock = getStock(productId);
+    if (stock !== null && quantity > stock) {
+      alert(`재고 부족 (현재 ${stock}개)`);
       return;
     }
-    setCart(prev =>
-      prev.map(item =>
-        item.productId === productId ? { ...item, quantity } : item
-      )
-    );
+    setCart(prev => prev.map(item => item.productId === productId ? { ...item, quantity } : item));
   };
 
-  const handleBarcodeScan = (barcode: string) => {
-    const trimmed = barcode.trim();
-    if (!trimmed) return;
-    
-    const product = productMap.get(trimmed);
-    if (product) {
-      addToCart(product);
-      setLastScannedBarcode(trimmed);
-    } else {
-      alert(`바코드 "${trimmed}" 해당 제품이 없습니다.`);
-    }
-    setSearch('');
+  // ── 통합 검색 (바코드 + 이름/코드) ────────────────────────────────────────
+  const handleSearchEnter = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key !== 'Enter' || !search.trim()) return;
+    const trimmed = search.trim();
+    // 정확히 일치하면 즉시 담기 (바코드 스캔)
+    const exact = productMap.get(trimmed);
+    if (exact) { addToCart(exact); return; }
+    // 검색 결과가 1개면 담기
+    if (filteredProducts.length === 1) { addToCart(filteredProducts[0]); return; }
+    if (filteredProducts.length === 0) alert(`"${trimmed}" 해당 제품이 없습니다.`);
   };
 
+  // ── 고객 선택 ─────────────────────────────────────────────────────────────
   const selectCustomer = async (customer: Customer) => {
     const supabase = createClient();
     const { data: lastHistory } = await supabase
-      .from('point_history')
-      .select('balance')
+      .from('point_history').select('balance')
       .eq('customer_id', customer.id)
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle() as any;
-    
-    const customerWithPoints = {
-      ...customer,
-      currentPoints: lastHistory?.balance || 0,
-    };
-    setSelectedCustomer(customerWithPoints);
+      .order('created_at', { ascending: false }).limit(1).maybeSingle() as any;
+
+    setSelectedCustomer({ ...customer, currentPoints: lastHistory?.balance || 0 });
     setCustomerSearch('');
     setCustomerResults([]);
     setShowCustomerDropdown(false);
+    setShowQuickReg(false);
     setUsePoints(false);
     setPointsToUse(0);
   };
@@ -210,18 +227,51 @@ export default function POSPage() {
     setCustomerSearch('');
     setCustomerResults([]);
     setShowCustomerDropdown(false);
+    setShowQuickReg(false);
     setUsePoints(false);
     setPointsToUse(0);
     customerInputRef.current?.focus();
   };
 
+  // ── 빠른 고객 등록 ─────────────────────────────────────────────────────────
+  const handleQuickRegister = async () => {
+    if (!quickName.trim() || !quickPhone.trim()) return;
+    setQuickRegLoading(true);
+    const supabase = createClient();
+    const { data, error } = await (supabase as any).from('customers').insert({
+      name: quickName.trim(),
+      phone: quickPhone.trim(),
+      grade: 'NORMAL',
+      is_active: true,
+      primary_branch_id: selectedBranch || null,
+    }).select('id, name, phone, grade').single();
+
+    if (error) {
+      alert(`등록 실패: ${error.message}`);
+      setQuickRegLoading(false);
+      return;
+    }
+    // 고객 목록에 추가
+    const newCustomer = { ...(data as any), grade_point_rate: 1.0 };
+    setCustomers(prev => [...prev, newCustomer]);
+    await selectCustomer(newCustomer);
+    setQuickName('');
+    setQuickPhone('');
+    setQuickRegLoading(false);
+  };
+
+  // ── 금액 계산 ──────────────────────────────────────────────────────────────
   const total = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
   const finalAmount = usePoints && selectedCustomer ? Math.max(0, total - pointsToUse) : total;
+  const cashReceivedNum = parseInt(cashReceived.replace(/,/g, '')) || 0;
+  const change = paymentMethod === 'cash' && cashReceivedNum > 0 ? cashReceivedNum - finalAmount : 0;
 
+  // ── 결제 처리 ─────────────────────────────────────────────────────────────
   const handlePayment = async () => {
     if (cart.length === 0) return;
-    if (!selectedBranch) {
-      alert('지점을 선택해주세요.');
+    if (!selectedBranch) { alert('지점을 선택해주세요.'); return; }
+    if (paymentMethod === 'cash' && cashReceivedNum > 0 && cashReceivedNum < finalAmount) {
+      alert(`받은 금액(${cashReceivedNum.toLocaleString()}원)이 결제 금액(${finalAmount.toLocaleString()}원)보다 적습니다.`);
       return;
     }
 
@@ -229,39 +279,48 @@ export default function POSPage() {
     const supabase = createClient();
     const db = supabase as any;
 
-    let saleOrderId = null;
-    let orderNumber = '';
-
     try {
-      // 1. 먼저 판매 전표 생성 (재고 차감 전에)
+      // ① 재고 사전 확인 (전체)
+      for (const item of cart) {
+        const { data: inv } = await supabase
+          .from('inventories').select('id, quantity')
+          .eq('branch_id', selectedBranch).eq('product_id', item.productId).single();
+        if (!inv || (inv as any).quantity < item.quantity) {
+          alert(`"${item.name}" 재고 부족 (현재: ${(inv as any)?.quantity ?? 0}개, 요청: ${item.quantity}개)`);
+          setProcessing(false);
+          return;
+        }
+      }
+
+      // ② 판매 전표 생성
       const today = new Date().toISOString().slice(0, 10).replace(/-/g, '');
       const branchCode = branches.find(b => b.id === selectedBranch)?.code || 'ETC';
       const randomSuffix = Math.random().toString(36).substring(2, 6).toUpperCase();
-      orderNumber = `SA-${branchCode}-${today}-${randomSuffix}`;
+      const orderNumber = `SA-${branchCode}-${today}-${randomSuffix}`;
 
-      // 쿠키에서 사용자 ID 가져오기 (자체 로그인 시스템)
-      const userId = getCookie('user_id');
-      let orderedByUserId = userId || null;
+      const pointsEarned = selectedCustomer
+        ? Math.floor(finalAmount * (selectedCustomer.grade_point_rate || 1.0) / 100)
+        : 0;
 
       const { data: saleOrder, error: saleError } = await db.from('sales_orders').insert({
         order_number: orderNumber,
         channel: branches.find(b => b.id === selectedBranch)?.channel || 'STORE',
         branch_id: selectedBranch,
         customer_id: selectedCustomer?.id || null,
-        ordered_by: orderedByUserId,
+        ordered_by: getCookie('user_id') || null,
         total_amount: total,
         discount_amount: usePoints ? pointsToUse : 0,
         status: 'COMPLETED',
         payment_method: paymentMethod,
-        points_earned: Math.floor(finalAmount * (selectedCustomer?.grade_point_rate || 1.0) / 100),
+        points_earned: pointsEarned,
         points_used: usePoints ? pointsToUse : 0,
         ordered_at: new Date().toISOString(),
       }).select().single();
 
       if (saleError) throw saleError;
-      saleOrderId = (saleOrder as any).id;
+      const saleOrderId = (saleOrder as any).id;
 
-      // 2. 판매 항목 저장
+      // ③ 판매 항목 저장
       for (const item of cart) {
         await db.from('sales_order_items').insert({
           sales_order_id: saleOrderId,
@@ -273,28 +332,13 @@ export default function POSPage() {
         });
       }
 
-      // 3. 재고 확인 및 차감 (판매 전표 생성 후에)
+      // ④ 재고 차감 (사전 확인 통과 후이므로 롤백 없이 진행)
       for (const item of cart) {
-        const { data: inventory } = await supabase
-          .from('inventories')
-          .select('id, quantity')
-          .eq('branch_id', selectedBranch)
-          .eq('product_id', item.productId)
-          .single();
-
-        const inv = inventory as any;
-        if (!inv || inv.quantity < item.quantity) {
-          // 재고 부족 - 방금 생성한 판매 전표 삭제
-          await db.from('sales_orders').delete().eq('id', saleOrderId);
-          alert(`"${item.name}" 재고가 부족합니다. 결제가 취소되었습니다.`);
-          setProcessing(false);
-          return;
-        }
-
-        await db.from('inventories').update({
-          quantity: inv.quantity - item.quantity,
-        }).eq('id', inv.id);
-
+        const { data: inv } = await supabase
+          .from('inventories').select('id, quantity')
+          .eq('branch_id', selectedBranch).eq('product_id', item.productId).single();
+        const inv_ = inv as any;
+        await db.from('inventories').update({ quantity: inv_.quantity - item.quantity }).eq('id', inv_.id);
         await db.from('inventory_movements').insert({
           branch_id: selectedBranch,
           product_id: item.productId,
@@ -304,391 +348,414 @@ export default function POSPage() {
           reference_type: 'POS_SALE',
           memo: null,
         });
+        // 로컬 재고 맵 즉시 업데이트
+        const key = `${selectedBranch}_${item.productId}`;
+        setInventoryMap(prev => new Map(prev).set(key, (prev.get(key) ?? 0) - item.quantity));
       }
 
-      // 4. 포인트 사용/적립
+      // ⑤ 포인트 처리
       if (selectedCustomer) {
-        const pointRate = selectedCustomer.grade_point_rate || 1.0;
-        const pointsEarned = Math.floor(finalAmount * pointRate / 100);
-        
-        const { data: lastHistory } = await db
-          .from('point_history')
-          .select('balance')
-          .eq('customer_id', selectedCustomer.id)
-          .order('created_at', { ascending: false })
-          .limit(1)
-          .maybeSingle();
-        
-        const currentPoints = lastHistory?.balance || 0;
-        
+        const { data: lastHist } = await db.from('point_history').select('balance')
+          .eq('customer_id', selectedCustomer.id).order('created_at', { ascending: false }).limit(1).maybeSingle();
+        const currentPoints = lastHist?.balance || 0;
+
         if (usePoints && pointsToUse > 0) {
-          const newBalanceAfterUse = currentPoints - pointsToUse;
+          const afterUse = currentPoints - pointsToUse;
           await db.from('point_history').insert({
-            customer_id: selectedCustomer.id,
-            sales_order_id: saleOrderId,
-            type: 'use',
-            points: -pointsToUse,
-            balance: newBalanceAfterUse,
+            customer_id: selectedCustomer.id, sales_order_id: saleOrderId,
+            type: 'use', points: -pointsToUse, balance: afterUse,
             description: `포인트 사용 (${orderNumber})`,
           });
-          const finalBalance = newBalanceAfterUse + pointsEarned;
           await db.from('point_history').insert({
-            customer_id: selectedCustomer.id,
-            sales_order_id: saleOrderId,
-            type: 'earn',
-            points: pointsEarned,
-            balance: finalBalance,
-            description: `구매 적립 (${orderNumber}) - ${pointRate}%`,
+            customer_id: selectedCustomer.id, sales_order_id: saleOrderId,
+            type: 'earn', points: pointsEarned, balance: afterUse + pointsEarned,
+            description: `구매 적립 (${orderNumber})`,
           });
         } else {
-          const newBalance = currentPoints + pointsEarned;
           await db.from('point_history').insert({
-            customer_id: selectedCustomer.id,
-            sales_order_id: saleOrderId,
-            type: 'earn',
-            points: pointsEarned,
-            balance: newBalance,
-            description: `구매 적립 (${orderNumber}) - ${pointRate}%`,
+            customer_id: selectedCustomer.id, sales_order_id: saleOrderId,
+            type: 'earn', points: pointsEarned, balance: currentPoints + pointsEarned,
+            description: `구매 적립 (${orderNumber})`,
           });
         }
       }
 
-      // 영수증 데이터 저장
-      const pointsEarned = selectedCustomer
-        ? Math.floor(finalAmount * (selectedCustomer.grade_point_rate || 1.0) / 100)
-        : 0;
+      // 영수증 표시
       setReceiptData({
-        orderNumber,
-        branchName: branches.find(b => b.id === selectedBranch)?.name || '',
+        orderNumber, branchName: branches.find(b => b.id === selectedBranch)?.name || '',
         customerName: selectedCustomer?.name,
-        items: cart.map(item => ({
-          name: item.name,
-          quantity: item.quantity,
-          unitPrice: item.price,
-          totalPrice: item.price * item.quantity,
-        })),
-        totalAmount: total,
-        discountAmount: usePoints ? pointsToUse : 0,
-        finalAmount,
-        pointsUsed: usePoints ? pointsToUse : 0,
-        pointsEarned,
-        paymentMethod,
+        items: cart.map(item => ({ name: item.name, quantity: item.quantity, unitPrice: item.price, totalPrice: item.price * item.quantity })),
+        totalAmount: total, discountAmount: usePoints ? pointsToUse : 0,
+        finalAmount, pointsUsed: usePoints ? pointsToUse : 0, pointsEarned,
+        paymentMethod, cashReceived: paymentMethod === 'cash' && cashReceivedNum > 0 ? cashReceivedNum : undefined,
+        change: paymentMethod === 'cash' && change > 0 ? change : undefined,
         orderedAt: new Date().toISOString(),
       });
+
       setCart([]);
       setSelectedCustomer(null);
       setCustomerSearch('');
       setUsePoints(false);
       setPointsToUse(0);
+      setCashReceived('');
+
     } catch (err: any) {
       console.error('결제 오류:', err);
-      // 에러 발생 시 방금 생성한 판매 전표도 삭제
-      if (saleOrderId) {
-        try {
-          await db.from('sales_orders').delete().eq('id', saleOrderId);
-        } catch (e) {
-          console.error('판매 전표 삭제 실패:', e);
-        }
-      }
-      const errorMsg = err?.message || err?.details || JSON.stringify(err);
-      alert(`결제 처리 중 오류가 발생했습니다.\n\n${errorMsg}\n\n브라우저 콘솔(F12)을 확인해주세요.`);
+      alert(`결제 처리 중 오류가 발생했습니다.\n\n${err?.message || JSON.stringify(err)}`);
     }
 
     setProcessing(false);
   };
 
+  // ── 수량 직접 입력 커밋 ────────────────────────────────────────────────────
+  const commitQtyEdit = (productId: string) => {
+    const val = parseInt(editingQtyVal);
+    if (!isNaN(val)) updateQuantity(productId, val);
+    setEditingQtyId(null);
+    setEditingQtyVal('');
+  };
+
+  // ── 렌더링 ─────────────────────────────────────────────────────────────────
   return (
-    <div className="flex gap-6 h-[calc(100vh-8rem)]">
-      <div className="flex-1 flex flex-col">
+    <div className="flex gap-4 h-[calc(100vh-8rem)]">
+      {/* 왼쪽: 제품 검색 + 그리드 */}
+      <div className="flex-1 flex flex-col min-w-0">
+        {/* 통합 검색 */}
         <div className="mb-3">
-          <div className="flex gap-2">
-            <div className="flex-1 relative">
-              <input
-                ref={productSearchRef}
-                type="text"
-                placeholder="제품검색 (이름/코드)... 또는 바코드 스캔"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && search.trim()) {
-                    const product = products.find(p => p.code === search.trim() || p.barcode === search.trim());
-                    if (product) {
-                      addToCart(product);
-                    }
-                  }
-                }}
-                className="input"
-              />
-            </div>
-          </div>
-          <div className="mt-2 relative">
-            <input
-              ref={barcodeInputRef}
-              type="text"
-              placeholder="📷 바코드 리더 (Enter 자동 인식)"
-              className="input text-sm border-2 border-blue-200 focus:border-blue-400"
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  const target = e.target as HTMLInputElement;
-                  handleBarcodeScan(target.value);
-                  target.value = '';
-                }
-              }}
-              onFocus={() => {
-                if (lastScannedBarcode) setLastScannedBarcode('');
-              }}
-            />
-            {lastScannedBarcode && (
-              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-green-600 bg-green-50 px-2 py-1 rounded">
-                ✓ {lastScannedBarcode}
-              </span>
-            )}
-          </div>
+          <input
+            ref={searchRef}
+            type="text"
+            placeholder="제품명, 코드 검색 또는 바코드 스캔 후 Enter"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            onKeyDown={handleSearchEnter}
+            className="input w-full text-sm"
+            autoComplete="off"
+          />
+          {search && (
+            <p className="text-xs text-slate-400 mt-1 pl-1">
+              {filteredProducts.length}개 · Enter키로 첫 번째 항목 담기
+            </p>
+          )}
         </div>
 
+        {/* 제품 그리드 */}
         <div className="flex-1 overflow-auto">
           {loading ? (
             <p className="text-center text-slate-400 py-8">로딩 중...</p>
+          ) : filteredProducts.length === 0 && search ? (
+            <p className="text-center text-slate-400 py-8">검색 결과가 없습니다</p>
           ) : (
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-              {filteredProducts.map(product => (
-                <button
-                  key={product.id}
-                  onClick={() => addToCart(product)}
-                  className="bg-white p-4 rounded-lg shadow hover:shadow-md transition-shadow text-left border border-slate-100 hover:border-blue-300"
-                >
-                  {product.barcode && (
-                    <p className="text-xs text-slate-400 font-mono mb-1">{product.barcode}</p>
-                  )}
-                  <p className="font-medium text-slate-800">{product.name}</p>
-                  <p className="text-xs text-slate-400 mb-2">{product.code}</p>
-                  <p className="text-lg font-bold text-blue-600">
-                    {product.price.toLocaleString()}원
-                  </p>
-                  {product.inventories?.quantity !== undefined && (
-                    <p className={`text-xs mt-1 ${product.inventories.quantity < 10 ? 'text-red-500' : 'text-slate-500'}`}>
-                      재고: {product.inventories.quantity}
-                    </p>
-                  )}
-                </button>
-              ))}
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+              {filteredProducts.map(product => {
+                const stock = getStock(product.id);
+                const inCart = cart.find(i => i.productId === product.id)?.quantity ?? 0;
+                const isOutOfStock = stock !== null && stock === 0;
+                const isLow = stock !== null && stock > 0 && stock < 10;
+                return (
+                  <button
+                    key={product.id}
+                    onClick={() => addToCart(product)}
+                    disabled={isOutOfStock}
+                    className={`bg-white p-3 rounded-lg shadow-sm text-left border transition-all ${
+                      isOutOfStock
+                        ? 'border-slate-100 opacity-40 cursor-not-allowed'
+                        : 'border-slate-100 hover:border-blue-300 hover:shadow-md active:scale-95'
+                    } ${inCart > 0 ? 'ring-2 ring-blue-400 ring-inset' : ''}`}
+                  >
+                    {product.barcode && (
+                      <p className="text-xs text-slate-400 font-mono mb-0.5 truncate">{product.barcode}</p>
+                    )}
+                    <p className="font-medium text-slate-800 text-sm leading-tight">{product.name}</p>
+                    <p className="text-xs text-slate-400 mb-1.5">{product.code}</p>
+                    <p className="text-base font-bold text-blue-600">{product.price.toLocaleString()}원</p>
+                    <div className="flex items-center justify-between mt-1">
+                      <span className={`text-xs ${
+                        isOutOfStock ? 'text-red-500 font-semibold' :
+                        isLow ? 'text-orange-500' : 'text-slate-400'
+                      }`}>
+                        {stock === null ? '' : isOutOfStock ? '품절' : `재고 ${stock}`}
+                      </span>
+                      {inCart > 0 && (
+                        <span className="text-xs bg-blue-600 text-white px-1.5 py-0.5 rounded-full">{inCart}</span>
+                      )}
+                    </div>
+                  </button>
+                );
+              })}
             </div>
           )}
         </div>
       </div>
 
-      <div className="w-[420px] bg-white rounded-lg shadow flex flex-col">
-        <div className="p-4 border-b">
-          <h3 className="font-semibold text-lg">장바구니</h3>
+      {/* 오른쪽: 장바구니 + 결제 */}
+      <div className="w-[400px] bg-white rounded-lg shadow flex flex-col shrink-0">
+        <div className="px-4 py-3 border-b flex items-center justify-between">
+          <h3 className="font-semibold">장바구니 {cart.length > 0 && <span className="text-sm font-normal text-slate-500">({cart.length}종)</span>}</h3>
+          {cart.length > 0 && (
+            <button onClick={() => setCart([])} className="text-xs text-red-400 hover:text-red-600">전체 삭제</button>
+          )}
         </div>
 
-        <div className="flex-1 overflow-auto p-4 space-y-3">
+        {/* 장바구니 목록 */}
+        <div className="flex-1 overflow-auto p-3 space-y-2">
           {cart.map(item => (
-            <div key={item.productId} className="flex justify-between items-center p-3 bg-slate-50 rounded-lg">
-              <div className="flex-1">
-                <p className="font-medium">{item.name}</p>
-                <p className="text-sm text-slate-500">
-                  {item.price.toLocaleString()}원
-                </p>
+            <div key={item.productId} className="flex items-center gap-2 p-2.5 bg-slate-50 rounded-lg">
+              <div className="flex-1 min-w-0">
+                <p className="font-medium text-sm truncate">{item.name}</p>
+                <p className="text-xs text-slate-500">{item.price.toLocaleString()}원 × {item.quantity} = <strong>{(item.price * item.quantity).toLocaleString()}원</strong></p>
               </div>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => updateQuantity(item.productId, item.quantity - 1)}
-                  className="w-8 h-8 bg-slate-200 rounded hover:bg-slate-300"
-                >
-                  -
-                </button>
-                <span className="w-8 text-center">{item.quantity}</span>
-                <button
-                  onClick={() => updateQuantity(item.productId, item.quantity + 1)}
-                  className="w-8 h-8 bg-slate-200 rounded hover:bg-slate-300"
-                >
-                  +
-                </button>
-                <button
-                  onClick={() => removeFromCart(item.productId)}
-                  className="w-8 h-8 bg-red-100 text-red-600 rounded hover:bg-red-200"
-                >
-                  ✕
-                </button>
+              <div className="flex items-center gap-1.5 shrink-0">
+                <button onClick={() => updateQuantity(item.productId, item.quantity - 1)} className="w-7 h-7 bg-slate-200 rounded text-sm hover:bg-slate-300">-</button>
+                {editingQtyId === item.productId ? (
+                  <input
+                    ref={editingQtyRef}
+                    type="number"
+                    value={editingQtyVal}
+                    onChange={e => setEditingQtyVal(e.target.value)}
+                    onBlur={() => commitQtyEdit(item.productId)}
+                    onKeyDown={e => { if (e.key === 'Enter') commitQtyEdit(item.productId); if (e.key === 'Escape') { setEditingQtyId(null); setEditingQtyVal(''); } }}
+                    className="w-12 text-center border border-blue-400 rounded text-sm px-1 py-0.5"
+                    min="1"
+                  />
+                ) : (
+                  <button
+                    onClick={() => { setEditingQtyId(item.productId); setEditingQtyVal(String(item.quantity)); }}
+                    title="클릭하여 수량 직접 입력"
+                    className="w-8 text-center font-semibold text-sm hover:bg-blue-50 rounded py-0.5"
+                  >
+                    {item.quantity}
+                  </button>
+                )}
+                <button onClick={() => updateQuantity(item.productId, item.quantity + 1)} className="w-7 h-7 bg-slate-200 rounded text-sm hover:bg-slate-300">+</button>
+                <button onClick={() => removeFromCart(item.productId)} className="w-7 h-7 bg-red-100 text-red-500 rounded text-xs hover:bg-red-200">✕</button>
               </div>
             </div>
           ))}
           {cart.length === 0 && (
-            <p className="text-center text-slate-400 py-8">
-              장바구니가 비어있습니다
-            </p>
+            <p className="text-center text-slate-400 py-8 text-sm">제품을 선택해주세요</p>
           )}
         </div>
 
-        <div className="p-4 border-t space-y-4">
-          {usePoints && selectedCustomer && (
-            <div className="flex justify-between text-sm text-green-600">
-              <span>포인트 할인</span>
-              <span>-{pointsToUse.toLocaleString()}P</span>
-            </div>
-          )}
-          <div className="flex justify-between text-lg font-bold">
-            <span>합계</span>
-            <span className={usePoints && selectedCustomer ? 'text-green-600' : ''}>
-              {finalAmount.toLocaleString()}원
-            </span>
-          </div>
-
+        {/* 결제 영역 */}
+        <div className="p-4 border-t space-y-3">
+          {/* 지점 선택 */}
           <select
             value={selectedBranch}
-            onChange={(e) => setSelectedBranch(e.target.value)}
+            onChange={e => setSelectedBranch(e.target.value)}
             disabled={isBranchUser}
-            className={`input ${isBranchUser ? 'bg-slate-100 cursor-not-allowed' : ''}`}
+            className={`input text-sm ${isBranchUser ? 'bg-slate-100 cursor-not-allowed' : ''}`}
           >
             <option value="">지점 선택</option>
-            {branches.map(b => (
-              <option key={b.id} value={b.id}>{b.name}</option>
-            ))}
+            {branches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
           </select>
 
+          {/* 고객 */}
           <div className="relative">
             {selectedCustomer ? (
               <div className="space-y-2">
-                <div className="flex items-center justify-between p-3 bg-blue-50 rounded-lg border border-blue-200">
+                <div className="flex items-center justify-between p-2.5 bg-blue-50 rounded-lg border border-blue-200">
                   <div>
-                    <p className="font-medium text-blue-800">{selectedCustomer.name}</p>
-                    <p className="text-sm text-blue-600">{selectedCustomer.phone}</p>
-                    <span className={`inline-block px-2 py-0.5 text-xs rounded mr-1 ${
-                      selectedCustomer.grade === 'VVIP' ? 'bg-red-100 text-red-700' :
-                      selectedCustomer.grade === 'VIP' ? 'bg-amber-100 text-amber-700' :
-                      'bg-slate-100 text-slate-600'
-                    }`}>
-                      {GRADE_LABELS[selectedCustomer.grade] || selectedCustomer.grade}
-                    </span>
-                    <span className="text-xs text-green-600 font-medium">
-                      {selectedCustomer.currentPoints?.toLocaleString() || 0}P
-                    </span>
+                    <p className="font-medium text-blue-800 text-sm">{selectedCustomer.name}</p>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      <span className={`px-1.5 py-0.5 text-xs rounded ${GRADE_BADGE[selectedCustomer.grade]}`}>
+                        {GRADE_LABELS[selectedCustomer.grade]}
+                      </span>
+                      <span className="text-xs text-green-600 font-medium">
+                        {selectedCustomer.currentPoints?.toLocaleString() || 0}P 보유
+                      </span>
+                    </div>
                   </div>
-                  <button onClick={clearCustomer} className="text-slate-400 hover:text-slate-600">
-                    ✕
-                  </button>
+                  <button onClick={clearCustomer} className="text-slate-400 hover:text-slate-600 text-lg leading-none">✕</button>
                 </div>
                 {selectedCustomer.currentPoints && selectedCustomer.currentPoints > 0 && (
-                  <div className="flex items-center gap-2 p-2 bg-green-50 rounded-lg border border-green-200">
+                  <div className="flex items-center gap-2 p-2 bg-green-50 rounded border border-green-200">
                     <input
-                      type="checkbox"
-                      id="usePoints"
-                      checked={usePoints}
-                      onChange={(e) => {
+                      type="checkbox" id="usePoints" checked={usePoints}
+                      onChange={e => {
                         setUsePoints(e.target.checked);
-                        if (e.target.checked) {
-                          setPointsToUse(Math.min(selectedCustomer.currentPoints || 0, total));
-                        } else {
-                          setPointsToUse(0);
-                        }
+                        setPointsToUse(e.target.checked ? Math.min(selectedCustomer.currentPoints || 0, total) : 0);
                       }}
                       className="w-4 h-4"
                     />
-                    <label htmlFor="usePoints" className="text-sm text-green-700 flex-1">
-                      포인트 사용 (보유: {selectedCustomer.currentPoints.toLocaleString()}P)
+                    <label htmlFor="usePoints" className="text-xs text-green-700 flex-1 cursor-pointer">
+                      포인트 사용 (보유 {selectedCustomer.currentPoints.toLocaleString()}P)
                     </label>
                     {usePoints && (
                       <input
                         type="number"
                         value={pointsToUse}
-                        onChange={(e) => {
-                          const val = parseInt(e.target.value) || 0;
-                          setPointsToUse(Math.min(val, Math.min(selectedCustomer.currentPoints || 0, total)));
-                        }}
-                        className="input w-24 text-right"
-                        min="0"
-                        max={Math.min(selectedCustomer.currentPoints || 0, total)}
+                        onChange={e => setPointsToUse(Math.min(parseInt(e.target.value) || 0, Math.min(selectedCustomer.currentPoints || 0, total)))}
+                        className="input w-20 text-right text-xs py-1"
+                        min="0" max={Math.min(selectedCustomer.currentPoints || 0, total)}
                       />
                     )}
                   </div>
                 )}
               </div>
             ) : (
-              <div className="relative">
+              <div>
                 <input
                   ref={customerInputRef}
                   type="text"
-                  placeholder="고객 검색 (이름/휴대폰 뒷자리)"
+                  placeholder="고객 검색 (이름 / 전화번호)"
                   value={customerSearch}
-                  onChange={(e) => setCustomerSearch(e.target.value)}
+                  onChange={e => setCustomerSearch(e.target.value)}
                   onFocus={() => customerSearch.length >= 1 && setShowCustomerDropdown(true)}
-                  onBlur={() => setTimeout(() => setShowCustomerDropdown(false), 200)}
-                  className="input"
+                  onBlur={() => setTimeout(() => { setShowCustomerDropdown(false); setShowQuickReg(false); }, 200)}
+                  className="input text-sm"
                 />
-                {showCustomerDropdown && customerResults.length > 0 && (
-                  <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg max-h-60 overflow-auto">
+                {showCustomerDropdown && (
+                  <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg max-h-64 overflow-auto">
                     {customerResults.map(c => (
                       <button
-                        key={c.id}
-                        onMouseDown={() => selectCustomer(c)}
-                        className="w-full text-left px-4 py-3 hover:bg-blue-50 border-b border-slate-100 last:border-b-0"
+                        key={c.id} onMouseDown={() => selectCustomer(c)}
+                        className="w-full text-left px-3 py-2.5 hover:bg-blue-50 border-b border-slate-100 last:border-b-0"
                       >
                         <div className="flex items-center justify-between">
                           <div>
-                            <p className="font-medium">{c.name}</p>
-                            <p className="text-sm text-slate-500">{c.phone}</p>
+                            <p className="font-medium text-sm">{c.name}</p>
+                            <p className="text-xs text-slate-500">{c.phone}</p>
                           </div>
-                          <span className={`px-2 py-0.5 text-xs rounded ${
-                            c.grade === 'VVIP' ? 'bg-red-100 text-red-700' :
-                            c.grade === 'VIP' ? 'bg-amber-100 text-amber-700' :
-                            'bg-slate-100 text-slate-600'
-                          }`}>
-                            {GRADE_LABELS[c.grade] || c.grade}
+                          <span className={`px-1.5 py-0.5 text-xs rounded ${GRADE_BADGE[c.grade]}`}>
+                            {GRADE_LABELS[c.grade]}
                           </span>
                         </div>
                       </button>
                     ))}
-                  </div>
-                )}
-                {showCustomerDropdown && customerSearch.length >= 1 && customerResults.length === 0 && (
-                  <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg p-4 text-center text-slate-400">
-                    검색 결과 없음
+                    {/* 신규 등록 */}
+                    {!showQuickReg ? (
+                      <button
+                        onMouseDown={e => { e.preventDefault(); setShowQuickReg(true); }}
+                        className="w-full text-left px-3 py-2.5 text-blue-600 hover:bg-blue-50 text-sm border-t border-slate-100 font-medium"
+                      >
+                        + 신규 고객 등록
+                      </button>
+                    ) : (
+                      <div className="p-3 border-t border-slate-100 space-y-2">
+                        <p className="text-xs font-semibold text-slate-600">빠른 고객 등록</p>
+                        <input
+                          type="text" placeholder="이름 *" value={quickName}
+                          onChange={e => setQuickName(e.target.value)}
+                          onMouseDown={e => e.stopPropagation()}
+                          className="input text-sm"
+                          autoFocus
+                        />
+                        <input
+                          type="text" placeholder="전화번호 * (010-XXXX-XXXX)" value={quickPhone}
+                          onChange={e => setQuickPhone(e.target.value)}
+                          onMouseDown={e => e.stopPropagation()}
+                          onKeyDown={e => e.key === 'Enter' && handleQuickRegister()}
+                          className="input text-sm"
+                        />
+                        <div className="flex gap-2">
+                          <button
+                            onMouseDown={e => { e.preventDefault(); handleQuickRegister(); }}
+                            disabled={!quickName.trim() || !quickPhone.trim() || quickRegLoading}
+                            className="flex-1 btn-primary py-1.5 text-sm disabled:opacity-50"
+                          >
+                            {quickRegLoading ? '등록 중...' : '등록 후 선택'}
+                          </button>
+                          <button
+                            onMouseDown={e => { e.preventDefault(); setShowQuickReg(false); }}
+                            className="flex-1 btn-secondary py-1.5 text-sm"
+                          >
+                            취소
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                    {customerResults.length === 0 && !showQuickReg && (
+                      <p className="px-3 py-2 text-xs text-slate-400 text-center">검색 결과 없음</p>
+                    )}
                   </div>
                 )}
               </div>
             )}
           </div>
 
-          <div className="grid grid-cols-3 gap-2">
-            <button
-              onClick={() => setPaymentMethod('cash')}
-              className={`py-2 rounded-md ${
-                paymentMethod === 'cash'
-                  ? 'bg-green-500 text-white'
-                  : 'bg-slate-100 text-slate-700'
-              }`}
-            >
-              현금
-            </button>
-            <button
-              onClick={() => setPaymentMethod('card')}
-              className={`py-2 rounded-md ${
-                paymentMethod === 'card'
-                  ? 'bg-green-500 text-white'
-                  : 'bg-slate-100 text-slate-700'
-              }`}
-            >
-              카드
-            </button>
-            <button
-              onClick={() => setPaymentMethod('kakao')}
-              className={`py-2 rounded-md ${
-                paymentMethod === 'kakao'
-                  ? 'bg-green-500 text-white'
-                  : 'bg-slate-100 text-slate-700'
-              }`}
-            >
-              카카오
-            </button>
+          {/* 금액 요약 */}
+          <div className="space-y-1 text-sm">
+            <div className="flex justify-between text-slate-500">
+              <span>소계</span><span>{total.toLocaleString()}원</span>
+            </div>
+            {usePoints && pointsToUse > 0 && (
+              <div className="flex justify-between text-green-600">
+                <span>포인트 할인</span><span>-{pointsToUse.toLocaleString()}P</span>
+              </div>
+            )}
+            <div className="flex justify-between font-bold text-base pt-1 border-t">
+              <span>결제 금액</span>
+              <span className={usePoints && pointsToUse > 0 ? 'text-green-600' : ''}>{finalAmount.toLocaleString()}원</span>
+            </div>
           </div>
 
+          {/* 결제 수단 */}
+          <div className="grid grid-cols-3 gap-1.5">
+            {(['cash', 'card', 'kakao'] as const).map(m => (
+              <button
+                key={m}
+                onClick={() => { setPaymentMethod(m); setCashReceived(''); }}
+                className={`py-2 rounded-md text-sm font-medium transition-colors ${
+                  paymentMethod === m ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                }`}
+              >
+                {m === 'cash' ? '현금' : m === 'card' ? '카드' : '카카오'}
+              </button>
+            ))}
+          </div>
+
+          {/* 현금 거스름돈 */}
+          {paymentMethod === 'cash' && (
+            <div className="space-y-1.5">
+              <div className="flex items-center gap-2">
+                <label className="text-xs text-slate-500 whitespace-nowrap w-16">받은 금액</label>
+                <input
+                  type="text"
+                  placeholder="0"
+                  value={cashReceived}
+                  onChange={e => {
+                    const raw = e.target.value.replace(/[^0-9]/g, '');
+                    setCashReceived(raw ? parseInt(raw).toLocaleString() : '');
+                  }}
+                  className="input text-right text-sm flex-1"
+                />
+                <span className="text-xs text-slate-400">원</span>
+              </div>
+              {/* 빠른 입력 버튼 */}
+              <div className="flex gap-1 flex-wrap">
+                {[10000, 50000, 100000].map(v => (
+                  <button
+                    key={v}
+                    onClick={() => setCashReceived(v.toLocaleString())}
+                    className="px-2 py-1 text-xs bg-slate-100 rounded hover:bg-blue-50 hover:text-blue-700"
+                  >
+                    {(v / 10000)}만
+                  </button>
+                ))}
+                <button
+                  onClick={() => setCashReceived(Math.ceil(finalAmount / 10000) * 10000 === finalAmount ? finalAmount.toLocaleString() : (Math.ceil(finalAmount / 10000) * 10000).toLocaleString())}
+                  className="px-2 py-1 text-xs bg-slate-100 rounded hover:bg-blue-50 hover:text-blue-700"
+                >
+                  딱맞게
+                </button>
+              </div>
+              {cashReceivedNum > 0 && (
+                <div className={`flex justify-between text-sm font-semibold px-1 ${change >= 0 ? 'text-blue-700' : 'text-red-500'}`}>
+                  <span>거스름돈</span>
+                  <span>{change >= 0 ? change.toLocaleString() : `부족 ${Math.abs(change).toLocaleString()}`}원</span>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* 결제 버튼 */}
           <button
             onClick={handlePayment}
-            disabled={cart.length === 0 || !selectedBranch || processing}
-            className="w-full btn-primary py-3 text-lg disabled:opacity-50 disabled:cursor-not-allowed"
+            disabled={cart.length === 0 || !selectedBranch || processing || (paymentMethod === 'cash' && cashReceivedNum > 0 && change < 0)}
+            className="w-full btn-primary py-3 text-base font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {processing ? '처리 중...' : '결제하기'}
+            {processing ? '처리 중...' : `결제 (${finalAmount.toLocaleString()}원)`}
           </button>
           <button
             onClick={() => setShowRefundModal(true)}
@@ -705,7 +772,7 @@ export default function POSPage() {
           onClose={() => setShowRefundModal(false)}
           onSuccess={(returnNumber) => {
             setShowRefundModal(false);
-            alert(`환불이 완료되었습니다.\n환불번호: ${returnNumber}`);
+            alert(`환불 완료\n환불번호: ${returnNumber}`);
           }}
         />
       )}
@@ -715,7 +782,7 @@ export default function POSPage() {
           {...receiptData}
           onClose={() => {
             setReceiptData(null);
-            barcodeInputRef.current?.focus();
+            searchRef.current?.focus();
           }}
         />
       )}

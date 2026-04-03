@@ -71,7 +71,7 @@ export class MiniMaxClient {
     const body: any = {
       model: this.model,
       messages: messages.map(m => {
-        const msg: any = { role: m.role, content: m.content };
+        const msg: any = { role: m.role, content: m.content ?? '' };
         if (m.tool_calls) msg.tool_calls = m.tool_calls;
         if (m.tool_call_id) msg.tool_call_id = m.tool_call_id;
         if (m.name) msg.name = m.name;
