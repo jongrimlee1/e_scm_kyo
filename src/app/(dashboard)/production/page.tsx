@@ -304,7 +304,7 @@ export default function ProductionPage() {
           products={products}
           bomList={bomList}
           onClose={() => setShowBomModal(false)}
-          onSuccess={() => { setShowBomModal(false); loadData(); }}
+          onSuccess={() => loadData()}
         />
       )}
     </div>
@@ -443,38 +443,60 @@ function NewOrderModal({ products, branchId, branchName, onClose, onSuccess }: {
 
 // ─── BOM 등록 모달 ─────────────────────────────────────────────────────────────
 
-function BomModal({ products, bomList, onClose, onSuccess }: {
+function BomModal({ products, bomList: initialBomList, onClose, onSuccess }: {
   products: any[];
   bomList: any[];
   onClose: () => void;
   onSuccess: () => void;
 }) {
+  const [localBomList, setLocalBomList] = useState(initialBomList);
   const [productId, setProductId] = useState('');
   const [materialId, setMaterialId] = useState('');
   const [quantity, setQuantity] = useState<number>(1);
   const [submitting, setSubmitting] = useState(false);
+  const [deleting, setDeleting] = useState<string | null>(null);
 
-  const existingBom = bomList.filter((b: any) => b.product_id === productId);
+  const existingBom = localBomList.filter((b: any) => b.product_id === productId);
   const availableMaterials = products.filter(
     p => p.id !== productId && !existingBom.some((b: any) => b.material_id === p.id)
   );
+
+  const refreshBomList = async () => {
+    const { data } = await getBomList();
+    setLocalBomList(data || []);
+  };
 
   const handleSubmit = async () => {
     setSubmitting(true);
     const r = await createBom(productId, materialId, quantity);
     setSubmitting(false);
     if (r.error) { alert(r.error); return; }
-    onSuccess();
+    await refreshBomList();
+    setMaterialId('');
+    setQuantity(1);
+  };
+
+  const handleDelete = async (bomId: string) => {
+    if (!confirm('이 BOM 항목을 삭제하시겠습니까?')) return;
+    setDeleting(bomId);
+    await deleteBom(bomId);
+    await refreshBomList();
+    setDeleting(null);
+  };
+
+  const handleClose = () => {
+    onSuccess(); // refresh parent data on close
+    onClose();
   };
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg w-full max-w-md shadow-xl">
+      <div className="bg-white rounded-lg w-full max-w-lg shadow-xl max-h-[90vh] flex flex-col">
         <div className="flex justify-between items-center px-6 py-4 border-b">
-          <h2 className="font-bold text-slate-800">BOM 등록</h2>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 text-xl">✕</button>
+          <h2 className="font-bold text-slate-800">BOM 관리</h2>
+          <button onClick={handleClose} className="text-slate-400 hover:text-slate-600 text-xl">✕</button>
         </div>
-        <div className="p-6 space-y-4">
+        <div className="p-6 space-y-4 overflow-y-auto flex-1">
           <div>
             <label className="block text-sm font-medium mb-1">완제품 *</label>
             <select value={productId} onChange={e => { setProductId(e.target.value); setMaterialId(''); }} className="input">
@@ -482,34 +504,74 @@ function BomModal({ products, bomList, onClose, onSuccess }: {
               {products.map(p => <option key={p.id} value={p.id}>{p.name} ({p.code})</option>)}
             </select>
           </div>
-          <div>
-            <label className="block text-sm font-medium mb-1">원재료 *</label>
-            <select value={materialId} onChange={e => setMaterialId(e.target.value)} className="input" disabled={!productId}>
-              <option value="">선택하세요</option>
-              {availableMaterials.map(p => <option key={p.id} value={p.id}>{p.name} ({p.code})</option>)}
-            </select>
-            {productId && availableMaterials.length === 0 && (
-              <p className="text-xs text-slate-400 mt-1">추가 가능한 원재료가 없습니다.</p>
-            )}
-          </div>
-          <div>
-            <label className="block text-sm font-medium mb-1">소요량 *</label>
-            <input
-              type="number" min="0.001" step="0.001" value={quantity}
-              onChange={e => setQuantity(parseFloat(e.target.value) || 1)}
-              className="input"
-            />
+
+          {productId && existingBom.length > 0 && (
+            <div>
+              <p className="text-sm font-medium mb-2 text-slate-600">현재 BOM 구성</p>
+              <div className="border rounded-lg overflow-hidden">
+                <table className="w-full text-sm">
+                  <thead className="bg-slate-50">
+                    <tr>
+                      <th className="text-left px-3 py-2 text-xs text-slate-500 font-medium">원재료</th>
+                      <th className="text-right px-3 py-2 text-xs text-slate-500 font-medium">소요량</th>
+                      <th className="w-12"></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {existingBom.map((b: any) => (
+                      <tr key={b.id} className="border-t border-slate-100">
+                        <td className="px-3 py-2">{b.material?.name} <span className="text-slate-400 text-xs">({b.material?.code})</span></td>
+                        <td className="px-3 py-2 text-right">{b.quantity} {b.material?.unit}</td>
+                        <td className="px-3 py-2 text-center">
+                          <button
+                            onClick={() => handleDelete(b.id)}
+                            disabled={deleting === b.id}
+                            className="text-red-400 hover:text-red-600 text-xs"
+                          >
+                            삭제
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          <div className="border-t pt-4">
+            <p className="text-sm font-medium mb-3">원재료 추가</p>
+            <div className="space-y-3">
+              <div>
+                <label className="block text-xs text-slate-500 mb-1">원재료 *</label>
+                <select value={materialId} onChange={e => setMaterialId(e.target.value)} className="input" disabled={!productId}>
+                  <option value="">선택하세요</option>
+                  {availableMaterials.map(p => <option key={p.id} value={p.id}>{p.name} ({p.code})</option>)}
+                </select>
+                {productId && availableMaterials.length === 0 && (
+                  <p className="text-xs text-slate-400 mt-1">추가 가능한 원재료가 없습니다.</p>
+                )}
+              </div>
+              <div>
+                <label className="block text-xs text-slate-500 mb-1">소요량 *</label>
+                <input
+                  type="number" min="0.001" step="0.001" value={quantity}
+                  onChange={e => setQuantity(parseFloat(e.target.value) || 1)}
+                  className="input"
+                />
+              </div>
+              <button
+                onClick={handleSubmit}
+                disabled={!productId || !materialId || quantity <= 0 || submitting}
+                className="btn-primary disabled:opacity-50"
+              >
+                {submitting ? '등록 중...' : '+ 원재료 추가'}
+              </button>
+            </div>
           </div>
         </div>
-        <div className="flex gap-2 px-6 py-4 border-t">
-          <button
-            onClick={handleSubmit}
-            disabled={!productId || !materialId || quantity <= 0 || submitting}
-            className="flex-1 btn-primary disabled:opacity-50"
-          >
-            {submitting ? '등록 중...' : '등록'}
-          </button>
-          <button onClick={onClose} className="flex-1 btn-secondary">취소</button>
+        <div className="px-6 py-4 border-t">
+          <button onClick={handleClose} className="w-full btn-secondary">완료</button>
         </div>
       </div>
     </div>

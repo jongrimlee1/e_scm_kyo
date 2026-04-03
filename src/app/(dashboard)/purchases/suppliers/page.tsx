@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
-import { updateSupplier } from '@/lib/purchase-actions';
+import { toggleSupplierActive } from '@/lib/purchase-actions';
 import SupplierModal from '../SupplierModal';
 
 interface Supplier {
@@ -54,10 +54,7 @@ export default function SuppliersPage() {
   const handleToggleActive = async (s: Supplier) => {
     const label = s.is_active ? '비활성화' : '활성화';
     if (!confirm(`${s.name}을(를) ${label}하시겠습니까?`)) return;
-    const fd = new FormData();
-    fd.append('name', s.name);
-    fd.append('is_active', String(!s.is_active));
-    await updateSupplier(s.id, fd);
+    await toggleSupplierActive(s.id, !s.is_active);
     fetchSuppliers();
   };
 

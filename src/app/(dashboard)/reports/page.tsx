@@ -62,6 +62,29 @@ const CHANNEL_NAMES: Record<string, string> = {
   EVENT: '이벤트',
 };
 
+const PO_STATUS_LABELS: Record<string, string> = {
+  DRAFT: '초안',
+  CONFIRMED: '확정',
+  PARTIALLY_RECEIVED: '부분입고',
+  RECEIVED: '입고완료',
+  CANCELLED: '취소',
+};
+
+const RETURN_REASON_LABELS: Record<string, string> = {
+  DEFECTIVE: '불량품',
+  WRONG_ITEM: '상품 오류',
+  CHANGE_OF_MIND: '단순 반품',
+  DUPLICATE: '중복 주문',
+  OTHER: '기타',
+};
+
+const REFUND_METHOD_LABELS: Record<string, string> = {
+  cash: '현금',
+  card: '카드',
+  kakao: '카카오페이',
+  point: '포인트',
+};
+
 type ReportTab = 'sales' | 'purchase' | 'pl' | 'trend' | 'margin';
 
 export default function ReportsPage() {
@@ -562,7 +585,7 @@ export default function ReportsPage() {
                       <td className="font-mono text-sm text-blue-700">{p.po_number}</td>
                       <td>{(p.supplier as any)?.name || '-'}</td>
                       <td className="text-slate-500">{(p.branch as any)?.name || '-'}</td>
-                      <td><span className="badge bg-blue-100 text-blue-700 text-xs">{p.status}</span></td>
+                      <td><span className="badge bg-blue-100 text-blue-700 text-xs">{PO_STATUS_LABELS[p.status] || p.status}</span></td>
                       <td className="text-right font-medium">{(p.total_amount || 0).toLocaleString()}원</td>
                     </tr>
                   ))}
@@ -595,8 +618,8 @@ export default function ReportsPage() {
                     <tr key={r.id}>
                       <td className="text-sm">{r.processed_at?.slice(0, 10)}</td>
                       <td className="font-mono text-sm text-red-700">{r.return_number}</td>
-                      <td className="text-slate-600">{r.reason}</td>
-                      <td>{r.refund_method}</td>
+                      <td className="text-slate-600">{RETURN_REASON_LABELS[r.reason] || r.reason || '-'}</td>
+                      <td>{REFUND_METHOD_LABELS[r.refund_method] || r.refund_method || '-'}</td>
                       <td className="text-slate-500">{(r.branch as any)?.name || '-'}</td>
                       <td className="text-right font-medium text-red-600">{(r.refund_amount || 0).toLocaleString()}원</td>
                     </tr>
