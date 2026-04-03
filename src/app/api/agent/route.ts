@@ -116,7 +116,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       type: 'success',
       message: result.message,
-      data: result.data,
     });
   } catch (error: any) {
     log('Error caught', error.message);
@@ -124,7 +123,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       type: 'error',
       message: error.message || '에러가 발생했습니다.',
-      error: error.toString(),
     }, { status: 500 });
   }
 }
@@ -333,9 +331,22 @@ async function executeOperation(supabase: any, operation: string, data: Record<s
 
       if (error) throw new Error(`제품 조회 실패: ${error.message}`);
 
+      if (!products || products.length === 0) {
+        return {
+          message: search ? `"${search}" 제품를 찾을 수 없습니다` : '등록된 제품이 없습니다',
+        };
+      }
+
+      if (products.length === 1) {
+        const p = products[0];
+        return {
+          message: `${p.name} (코드: ${p.code})을 찾았습니다. 가격은 ${p.price?.toLocaleString()}원입니다.${p.barcode ? ` 바코드: ${p.barcode}` : ''}`,
+        };
+      }
+
+      const list = products.slice(0, 5).map((p: any, i: number) => `${i + 1}. ${p.name} - ${p.price?.toLocaleString()}원`).join('\n');
       return {
-        message: `${products?.length || 0}개 제품 조회됨`,
-        data: products,
+        message: `${products.length}개의 제품이 조회되었습니다:\n${list}${products.length > 5 ? '\n...이 외 ' + (products.length - 5) + '개' : ''}`,
       };
     }
 
@@ -354,13 +365,19 @@ async function executeOperation(supabase: any, operation: string, data: Record<s
       if (!customers || customers.length === 0) {
         return {
           message: search ? `"${search}" 고객을 찾을 수 없습니다` : '등록된 고객이 없습니다',
-          data: [],
         };
       }
 
+      if (customers.length === 1) {
+        const c = customers[0];
+        return {
+          message: `${c.name} 고객을 찾았습니다. 전화번호는 ${c.phone}, 등급은 ${c.grade}입니다.${c.primary_branch ? ` 주요 지점은 ${c.primary_branch.name}입니다.` : ''}`,
+        };
+      }
+
+      const list = customers.map((c: any, i: number) => `${i + 1}. ${c.name} (${c.phone}) - ${c.grade}`).join('\n');
       return {
-        message: `${customers.length}명 고객 조회됨`,
-        data: customers,
+        message: `${customers.length}명의 고객이 조회되었습니다:\n${list}`,
       };
     }
 
@@ -376,17 +393,21 @@ async function executeOperation(supabase: any, operation: string, data: Record<s
 
       if (error) throw new Error(`지점 조회 실패: ${error.message}`);
 
+      if (!branches || branches.length === 0) {
+        return {
+          message: '등록된 지점이 없습니다',
+        };
+      }
+
+      const list = branches.map((b: any, i: number) => `${i + 1}. ${b.name} (${b.code}) - ${b.channel}`).join('\n');
       return {
-        message: `${branches?.length || 0}개 지점 조회됨`,
-        data: branches,
+        message: `${branches.length}개의 지점이 있습니다:\n${list}`,
       };
     }
 
     case 'info': {
-      const helpMessage = data?.message || 'AI 어시스턴트가 도와드릴 수 있습니다:\n• 고객 조회/검색/등록\n• 재고 이동/조정/입출고\n• 포인트 적립/사용/조회\n• 제품 검색\n• 지점 조회\n• 판매 주문 조회';
       return {
-        message: helpMessage,
-        data: data || {},
+        message: 'AI 어시스턴트가 도와드릴 수 있습니다:\n• 고객 조회/검색/등록\n• 재고 이동/조정/입출고\n• 포인트 적립/사용/조회\n• 제품 검색\n• 지점 조회\n• 판매 주문 조회\n\n무엇을 도와드릴까요?',
       };
     }
 
@@ -399,14 +420,15 @@ async function executeOperation(supabase: any, operation: string, data: Record<s
           .eq('customer_id', customerId)
           .order('created_at', { ascending: false })
           .limit(10);
-        return {
-          message: `포인트 조회 완료`,
-          data: history,
-        };
+        
+        if (!history || history.length === 0) {
+          return { message: '적립된 포인트 내역이 없습니다.' };
+        }
+        const latest = history[0];
+        return { message: `현재 ${latest.balance?.toLocaleString()}P가 적립되어 있습니다.` };
       }
       return {
-        message: `고객 전화번호나 이름을 알려주세요`,
-        data: {},
+        message: `포인트 조회할 고객 이름을 알려주세요`,
       };
     }
 
