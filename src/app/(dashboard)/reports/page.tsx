@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import { createClient } from '@/lib/supabase/client';
-import { formatPhone } from '@/lib/validators';
+import { jsPDF } from 'jspdf';
+import 'jspdf-autotable';
 
 function getCookie(name: string): string | null {
   if (typeof document === 'undefined') return null;
@@ -53,6 +54,13 @@ interface ProductSales {
   amount: number;
 }
 
+const CHANNEL_NAMES: Record<string, string> = {
+  STORE: '한약국',
+  DEPT_STORE: '백화점',
+  ONLINE: '자사몰',
+  EVENT: '이벤트',
+};
+
 export default function ReportsPage() {
   const [period, setPeriod] = useState<'daily' | 'weekly' | 'monthly'>('daily');
   const [startDate, setStartDate] = useState(() => {
@@ -63,6 +71,9 @@ export default function ReportsPage() {
   const [endDate, setEndDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [branches, setBranches] = useState<Branch[]>([]);
   const [loading, setLoading] = useState(true);
+
+  const [filterBranch, setFilterBranch] = useState('');
+  const [filterChannel, setFilterChannel] = useState('');
 
   const [salesData, setSalesData] = useState<SalesData>({
     totalAmount: 0,
@@ -75,6 +86,7 @@ export default function ReportsPage() {
   const [channelSales, setChannelSales] = useState<ChannelSales[]>([]);
   const [branchSales, setBranchSales] = useState<BranchSales[]>([]);
   const [productSales, setProductSales] = useState<ProductSales[]>([]);
+  const [rawOrders, setRawOrders] = useState<any[]>([]);
 
   const userRole = getCookie('user_role');
   const userBranchId = getCookie('user_branch_id');
@@ -85,19 +97,22 @@ export default function ReportsPage() {
       const supabase = createClient();
       const { data } = await supabase.from('branches').select('*').eq('is_active', true).order('created_at');
       setBranches(data || []);
+      if (isBranchUser && userBranchId) {
+        setFilterBranch(userBranchId);
+      }
     };
     fetchBranches();
   }, []);
 
   useEffect(() => {
     fetchReportData();
-  }, [startDate, endDate, userBranchId]);
+  }, [startDate, endDate, filterBranch, filterChannel]);
 
   const fetchReportData = async () => {
     setLoading(true);
     const supabase = createClient();
 
-    const { data: orders } = await supabase
+    let query = supabase
       .from('sales_orders')
       .select(`
         id,
@@ -107,20 +122,23 @@ export default function ReportsPage() {
         points_used,
         channel,
         branch_id,
-        created_at
+        branch:branches(name),
+        ordered_at
       `)
       .eq('status', 'COMPLETED')
       .gte('ordered_at', `${startDate}T00:00:00`)
-      .lte('ordered_at', `${endDate}T23:59:59`)
-      .order('ordered_at', { ascending: false });
+      .lte('ordered_at', `${endDate}T23:59:59`);
 
-    const { data: orderItems } = await supabase
+    const { data: orders } = await query;
+
+    let { data: orderItems } = await supabase
       .from('sales_order_items')
       .select(`
         product_id,
         product:products(name),
         quantity,
-        total_price
+        total_price,
+        created_at
       `)
       .gte('created_at', `${startDate}T00:00:00`)
       .lte('created_at', `${endDate}T23:59:59`);
@@ -130,36 +148,41 @@ export default function ReportsPage() {
       return;
     }
 
-    const ordersData = orders as any[];
-    const itemsData = (orderItems || []) as any[];
+    let ordersData = (orders as any[]).map(o => ({
+      ...o,
+      branchName: o.branch?.name || o.branch_id || '알 수 없음',
+    }));
 
-    const filteredOrders = isBranchUser && userBranchId
-      ? ordersData.filter(o => o.branch_id === userBranchId)
-      : ordersData;
+    if (isBranchUser && userBranchId) {
+      ordersData = ordersData.filter(o => o.branch_id === userBranchId);
+    }
 
-    const totalAmount = filteredOrders.reduce((sum, o) => sum + (o.total_amount || 0), 0);
-    const totalDiscount = filteredOrders.reduce((sum, o) => sum + (o.discount_amount || 0), 0);
-    const totalPointsEarned = filteredOrders.reduce((sum, o) => sum + (o.points_earned || 0), 0);
-    const totalPointsUsed = filteredOrders.reduce((sum, o) => sum + (o.points_used || 0), 0);
+    if (filterBranch) {
+      ordersData = ordersData.filter(o => o.branch_id === filterBranch);
+    }
+
+    if (filterChannel) {
+      ordersData = ordersData.filter(o => o.channel === filterChannel);
+    }
+
+    setRawOrders(ordersData);
+
+    const totalAmount = ordersData.reduce((sum, o) => sum + (o.total_amount || 0), 0);
+    const totalDiscount = ordersData.reduce((sum, o) => sum + (o.discount_amount || 0), 0);
+    const totalPointsEarned = ordersData.reduce((sum, o) => sum + (o.points_earned || 0), 0);
+    const totalPointsUsed = ordersData.reduce((sum, o) => sum + (o.points_used || 0), 0);
 
     setSalesData({
       totalAmount,
-      totalOrders: filteredOrders.length,
+      totalOrders: ordersData.length,
       totalDiscount,
       totalPointsEarned,
       totalPointsUsed,
-      avgOrderValue: filteredOrders.length > 0 ? Math.round(totalAmount / filteredOrders.length) : 0,
+      avgOrderValue: ordersData.length > 0 ? Math.round(totalAmount / ordersData.length) : 0,
     });
 
     const channelMap = new Map<string, { amount: number; count: number }>();
-    const channelNames: Record<string, string> = {
-      STORE: '한약국',
-      DEPT_STORE: '백화점',
-      ONLINE: '자사몰',
-      EVENT: '이벤트',
-    };
-
-    filteredOrders.forEach(o => {
+    ordersData.forEach(o => {
       const ch = o.channel || 'STORE';
       const existing = channelMap.get(ch) || { amount: 0, count: 0 };
       channelMap.set(ch, {
@@ -172,7 +195,7 @@ export default function ReportsPage() {
     channelMap.forEach((val, key) => {
       channelData.push({
         channel: key,
-        channelName: channelNames[key] || key,
+        channelName: CHANNEL_NAMES[key] || key,
         amount: val.amount,
         count: val.count,
         percentage: totalAmount > 0 ? Math.round((val.amount / totalAmount) * 100) : 0,
@@ -181,12 +204,10 @@ export default function ReportsPage() {
     setChannelSales(channelData.sort((a, b) => b.amount - a.amount));
 
     const branchMap = new Map<string, { name: string; amount: number; count: number }>();
-    filteredOrders.forEach(o => {
-      const branch = branches.find(b => b.id === o.branch_id);
-      const name = branch?.name || o.branch_id;
-      const existing = branchMap.get(o.branch_id) || { name, amount: 0, count: 0 };
+    ordersData.forEach(o => {
+      const existing = branchMap.get(o.branch_id) || { name: o.branchName, amount: 0, count: 0 };
       branchMap.set(o.branch_id, {
-        name,
+        name: o.branchName,
         amount: existing.amount + (o.total_amount || 0),
         count: existing.count + 1,
       });
@@ -205,7 +226,7 @@ export default function ReportsPage() {
     setBranchSales(branchData.sort((a, b) => b.amount - a.amount));
 
     const productMap = new Map<string, { name: string; quantity: number; amount: number }>();
-    itemsData.forEach((item: any) => {
+    (orderItems || []).forEach((item: any) => {
       const pid = item.product_id;
       const name = item.product?.name || '알 수 없음';
       const existing = productMap.get(pid) || { name, quantity: 0, amount: 0 };
@@ -245,6 +266,132 @@ export default function ReportsPage() {
     setEndDate(end.toISOString().slice(0, 10));
   };
 
+  const downloadPDF = () => {
+    const doc = new jsPDF();
+    const pageWidth = doc.internal.pageSize.getWidth();
+
+    doc.setFontSize(18);
+    doc.setFont('helvetica', 'bold');
+    doc.text('경옥채 매출 보고서', pageWidth / 2, 20, { align: 'center' });
+
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`기간: ${startDate} ~ ${endDate}`, pageWidth / 2, 28, { align: 'center' });
+
+    const filterText: string[] = [];
+    if (filterBranch) {
+      const branch = branches.find(b => b.id === filterBranch);
+      filterText.push(`지점: ${branch?.name || filterBranch}`);
+    }
+    if (filterChannel) {
+      filterText.push(`채널: ${CHANNEL_NAMES[filterChannel] || filterChannel}`);
+    }
+    if (filterText.length > 0) {
+      doc.text(filterText.join(' | '), pageWidth / 2, 34, { align: 'center' });
+    }
+
+    doc.setFontSize(14);
+    doc.setFont('helvetica', 'bold');
+    doc.text('매출 요약', 14, 48);
+
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    const summaryData = [
+      ['총 매출 (정상가)', `${salesData.totalAmount.toLocaleString()}원`],
+      ['포인트 할인', `-${salesData.totalDiscount.toLocaleString()}원`],
+      ['순매출', `${(salesData.totalAmount - salesData.totalDiscount).toLocaleString()}원`],
+      ['총 주문 건수', `${salesData.totalOrders}건`],
+      ['평균 객단가', `${salesData.avgOrderValue.toLocaleString()}원`],
+      ['적립 포인트', `+${salesData.totalPointsEarned.toLocaleString()}P`],
+      ['사용 포인트', `-${salesData.totalPointsUsed.toLocaleString()}P`],
+    ];
+
+    (doc as any).autoTable({
+      startY: 52,
+      head: [['항목', '금액']],
+      body: summaryData,
+      theme: 'striped',
+      headStyles: { fillColor: [59, 130, 246] },
+      columnStyles: { 1: { halign: 'right' } },
+      margin: { left: 14, right: 14 },
+    });
+
+    let yPos = (doc as any).lastAutoTable.finalY + 15;
+
+    doc.setFontSize(14);
+    doc.setFont('helvetica', 'bold');
+    doc.text('채널별 매출', 14, yPos);
+
+    const channelData = channelSales.map(ch => [
+      ch.channelName,
+      `${ch.amount.toLocaleString()}원`,
+      `${ch.count}건`,
+      `${ch.percentage}%`,
+    ]);
+
+    yPos += 8;
+    (doc as any).autoTable({
+      startY: yPos,
+      head: [['채널', '매출액', '주문수', '비율']],
+      body: channelData,
+      theme: 'striped',
+      headStyles: { fillColor: [59, 130, 246] },
+      columnStyles: { 1: { halign: 'right' }, 2: { halign: 'right' }, 3: { halign: 'right' } },
+      margin: { left: 14, right: 14 },
+    });
+
+    yPos = (doc as any).lastAutoTable.finalY + 15;
+
+    doc.setFontSize(14);
+    doc.setFont('helvetica', 'bold');
+    doc.text('지점별 매출', 14, yPos);
+
+    const branchData = branchSales.map(br => [
+      br.branchName,
+      `${br.amount.toLocaleString()}원`,
+      `${br.count}건`,
+      `${br.percentage}%`,
+    ]);
+
+    yPos += 8;
+    (doc as any).autoTable({
+      startY: yPos,
+      head: [['지점', '매출액', '주문수', '비율']],
+      body: branchData,
+      theme: 'striped',
+      headStyles: { fillColor: [59, 130, 246] },
+      columnStyles: { 1: { halign: 'right' }, 2: { halign: 'right' }, 3: { halign: 'right' } },
+      margin: { left: 14, right: 14 },
+    });
+
+    yPos = (doc as any).lastAutoTable.finalY + 15;
+
+    doc.setFontSize(14);
+    doc.setFont('helvetica', 'bold');
+    doc.text('인기 제품 (판매금액 기준)', 14, yPos);
+
+    const productData = productSales.map((p, i) => [
+      `${i + 1}`,
+      p.productName,
+      `${p.quantity.toLocaleString()}`,
+      `${p.amount.toLocaleString()}원`,
+    ]);
+
+    yPos += 8;
+    (doc as any).autoTable({
+      startY: yPos,
+      head: [['순위', '제품명', '판매수량', '판매금액']],
+      body: productData,
+      theme: 'striped',
+      headStyles: { fillColor: [59, 130, 246] },
+      columnStyles: { 2: { halign: 'right' }, 3: { halign: 'right' } },
+      margin: { left: 14, right: 14 },
+    });
+
+    const date = new Date().toISOString().slice(0, 10);
+    doc.save(`매출보고서_${date}.pdf`);
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center flex-wrap gap-4">
@@ -272,8 +419,32 @@ export default function ReportsPage() {
             onChange={(e) => setEndDate(e.target.value)}
             className="input"
           />
+          <select
+            value={filterChannel}
+            onChange={(e) => setFilterChannel(e.target.value)}
+            className="input"
+          >
+            <option value="">전체 채널</option>
+            {Object.entries(CHANNEL_NAMES).map(([code, name]) => (
+              <option key={code} value={code}>{name}</option>
+            ))}
+          </select>
+          <select
+            value={filterBranch}
+            onChange={(e) => setFilterBranch(e.target.value)}
+            className="input"
+            disabled={isBranchUser}
+          >
+            <option value="">전체 지점</option>
+            {branches.map(b => (
+              <option key={b.id} value={b.id}>{b.name}</option>
+            ))}
+          </select>
           <button onClick={fetchReportData} className="btn-secondary">
             조회
+          </button>
+          <button onClick={downloadPDF} className="btn-primary">
+            PDF 다운로드
           </button>
         </div>
       </div>
