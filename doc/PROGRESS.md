@@ -7,459 +7,290 @@
 | 항목 | 내용 |
 |------|------|
 | 프로젝트명 | 경옥채 사내 통합시스템 (ERP + CRM + 대시보드) |
-| 기술 스택 | Next.js 16, TypeScript, Supabase, Tailwind CSS |
+| 기술 스택 | Next.js 16 (App Router), TypeScript, Supabase (PostgreSQL), Tailwind CSS v4 |
 | 배포 | Vercel |
-| 데이터베이스 | Supabase (PostgreSQL) |
-| **PG 연동** | **토스페이먼트** (카드/현금) |
+| 저장소 | github.com/codeis8520-ctrl/e_scm_kyo |
 
 ---
 
-## 개발 로드맵 (PRD Phase 기준)
+## ⚠️ 외부 API / 환경변수 설정 필요 항목
 
-### Phase 1: 핵심 운영 기반 구축 ✅
-- [x] FR-E01: 품목 등록/관리
-- [x] FR-E02: 재고 확인, 입출고 관리
-- [x] FR-E03: BOM 기반 생산 전산화
-- [x] FR-E04: 백화점 판매 전표/POS 결제
-- [x] FR-D01~D05: 대시보드 매출/재고 현황
-- [x] FR-M01~M02: Cafe24 주문/배송 연동 (코드 완료, 설정 필요)
-- [ ] 권한 관리 기본 구조 (NFR-A01~A03)
+> 아래 항목들은 코드는 완성되어 있으나, **실제 운영을 위해 반드시 키 발급 및 설정이 필요**합니다.
+> `.env.local` 파일 및 Vercel 환경변수에 추가해야 합니다.
 
-### Phase 2: CRM 통합 및 고객 관계 관리 ✅
-- [x] FR-C01: 고객별 구매 이력 통합 조회
-- [x] FR-C02: 고객별 상담 기록 및 특이사항
-- [x] FR-C03: VIP 고객 분류 및 태그 관리
-- [x] FR-C05: 담당자 변경 시 고객 맥락 유지
-- [ ] FR-M03: 자사몰 고객 정보 CRM 연동
-- [ ] FR-R03: 재고 부족 품목 자동 알림
-- [ ] FR-R05: 대표/본사용 핵심 수치 요약 대시보드
-- [ ] FR-S04: 시즌 전 생산/재고 준비 현황 점검
+### 1. Solapi SMS / 알림톡 — ⚠️ 미설정 시 발송되지 않고 DB에만 기록됨
 
-### Phase 3: 보고 자동화 및 시즌 운영 고도화
-- [ ] FR-R01: 주간 및 월간 매출 요약 자동 생성
-- [ ] FR-R02: 지점별 성과 비교 보고서
-- [ ] FR-R04: 재구매 관리 필요 고객 목록 자동 추출
-- [ ] FR-C04: 재구매 예상 시점 확인 및 알림
-- [ ] FR-C06: 행사 초청, 후속 안내, 케어 이력
-- [ ] FR-C07: 고객 수요와 상품/재고 운영 연결
-- [ ] FR-S01~S03: 시즌별 목표/성과/후속 관리
-
-### Phase 4: PG 연동 (토스페이먼트) - 진행 중
-- [ ] POS 카드 결제 연동 (`POST /v1/payments/key-in`)
-- [ ] 현금 결제 연동
-- [ ] 결제 취소/환불 연동
-- [ ] PG 필드 DB 추가
-
----
-
-## 완료된 작업 내역
-
-### 2026-04-03
-
-#### 1. 채널 필터 탭 숨김 처리 (지점 사용자)
-
-**파일 수정:**
-- `src/app/(dashboard)/DashboardClient.tsx`
-
-**적용 내용:**
-- **BRANCH_STAFF / PHARMACY_STAFF** 역할 사용자에게 채널 필터 탭 숨김
-- 채널별 매출은 본사 관리자에게만 필요한 정보
-- 전체/한약국/백화점/자사몰/이벤트 탭이 지점 화면에 표시되지 않음
-
-```tsx
-{!isBranchUser && (
-  <div className="flex gap-2 flex-wrap">
-    {['ALL', 'STORE', 'DEPT_STORE', 'ONLINE', 'EVENT'].map((ch) => (
-      // 채널 필터 버튼
-    ))}
-  </div>
-)}
+```bash
+SOLAPI_API_KEY=          # Solapi 콘솔 > API 키 관리에서 발급
+SOLAPI_API_SECRET=       # Solapi 콘솔 > API 키 관리에서 발급
+SOLAPI_SENDER_PHONE=     # 발신번호 (01012345678 형식, 사전 등록 필수)
+SOLAPI_KAKAO_PFID=       # 알림톡 사용 시 카카오 플러스친구 채널 ID (선택)
 ```
 
-#### 2. 토스페이먼트 PG 연동 검토
+**설정 절차:**
+1. https://console.solapi.com 접속 후 API 키 발급
+2. 발신번호 메뉴에서 실제 사용할 번호 인증 등록
+3. 알림톡 사용 시: 카카오 비즈니스 채널 개설 → Solapi에서 채널 연동 → `PFID` 확인
+4. 알림톡 템플릿은 카카오 검수 후 Solapi 콘솔에서 `template_code` 확인
 
-**검토 내용:**
-- 토스페이먼트 vs 나이스페이먼트 비교 분석
-- 토스페이먼트 API 문서 검토 (`/v1/payments/key-in` 등)
-- POS 연동 방식 결정 (카드 번호 결제 API)
+**구현 위치:** `src/lib/solapi/client.ts`, `src/lib/notification-actions.ts`
 
-**토스페이먼트 POS 연동 방식:**
-| API | 용도 | 엔드포인트 |
-|-----|------|-----------|
-| 카드 번호 결제 | POS 수기결제 | `POST /v1/payments/key-in` |
-| 결제 취소 | 환불 | `POST /v1/payments/{paymentKey}/cancel` |
-| 결제 조회 | 확인 | `GET /v1/payments/orders/{orderId}` |
+---
 
-**필요 환경변수 (아직 미설정):**
+### 2. Supabase — 필수
+
+```bash
+NEXT_PUBLIC_SUPABASE_URL=https://xxxx.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJ...
+```
+
+---
+
+### 3. Cafe24 연동 — 자사몰 주문 자동 수집
+
+```bash
+CAFE24_MALL_ID=          # 자사몰 몰 ID
+CAFE24_CLIENT_ID=        # Cafe24 개발자센터 > 앱 > Client ID
+CAFE24_CLIENT_SECRET=    # Cafe24 개발자센터 > 앱 > Client Secret
+CAFE24_SHOP_NO=1         # 멀티쇼핑몰 번호 (기본 1)
+```
+
+**설정 절차:** `doc/CAFE24_SETUP.md` 참고
+
+**구현 위치:** `src/lib/cafe24/`, `src/app/api/webhooks/cafe24/route.ts`
+
+---
+
+### 4. AI 에이전트 (MiniMax)
+
+```bash
+MINIMAX_API_KEY=
+MINIMAX_BASE_URL=https://api.minimax.chat
+MINIMAX_MODEL=MiniMax-Text-01
+```
+
+---
+
+### 5. 토스페이먼트 PG — ⚠️ 미구현 (발주사 결제 정책 확정 후 개발 예정)
+
 ```bash
 NEXT_PUBLIC_TOSS_CLIENT_KEY=ck_test_xxx
 TOSS_SECRET_KEY=sk_test_xxx
-TOSS_IS_PRODUCTION=false
 ```
 
-**필요 DB 필드 (추가 예정):**
-```sql
-ALTER TABLE sales_orders ADD COLUMN pg_provider VARCHAR(20) DEFAULT 'toss';
-ALTER TABLE sales_orders ADD COLUMN pg_transaction_id VARCHAR(100);  -- paymentKey
-ALTER TABLE sales_orders ADD COLUMN pg_accept_no VARCHAR(50);          -- approveNo
-ALTER TABLE sales_orders ADD COLUMN pg_card_company VARCHAR(20);       -- 카드사 코드
-ALTER TABLE sales_orders ADD COLUMN pg_status VARCHAR(20);            -- DONE, CANCELLED
-```
-
-### 2026-04-02
-
-#### 1. 역할별 지점 권한 적용 (Dashboard + POS)
-
-**파일 수정:**
-- `src/app/(dashboard)/DashboardClient.tsx` - 지점별 초기값 및 viewMode 제한
-- `src/app/(dashboard)/pos/page.tsx` - 지점 선택 기본값 및 셀렉터 비활성화
-- `src/app/login/actions.ts` - branch_id 쿠키 추가
-
-**적용 내용:**
-- **BRANCH_STAFF / PHARMACY_STAFF** 역할 사용자:
-  - Dashboard: `selectedBranch` 초기값을 `user_branch_id` 쿠키로 설정
-  - Dashboard: viewMode 버튼 비활성화 (hq/branch 토글 불가)
-  - POS: branch selector 초기값을 `user_branch_id`로 설정
-  - POS: branch selector 비활성화 (다른 지점 선택 불가)
-
-**동작 방식:**
-```typescript
-// 쿠키에서 직접 초기값 설정 (IIFE)
-const initialBranch = (() => {
-  const role = getCookie('user_role');
-  const branchId = getCookie('user_branch_id');
-  if (role === 'BRANCH_STAFF' || role === 'PHARMACY_STAFF') {
-    return branchId || 'ALL';
-  }
-  return 'ALL';
-})();
-
-const [selectedBranch] = useState<string>(initialBranch);
-const isBranchUser = userRole === 'BRANCH_STAFF' || userRole === 'PHARMACY_STAFF';
-```
-
-### 2026-04-02 (이전)
-
-#### 1. 고객 등급별 적립율 추가
-**파일 수정:**
-- `supabase/schema.sql` - `customer_grades.point_rate` 필드 추가
-- `src/lib/actions.ts` - `createCustomerGrade`, `updateCustomerGrade`에 point_rate 추가
-- `src/app/(dashboard)/system-codes/page.tsx` - GradeModal에 적립율 입력 필드 추가
-
-**적용 내용:**
-- 등급 등록/수정 시 적립율(%) 입력 가능
-- NORMAL: 1%, VIP: 2%, VVIP: 3% 기본값
-
-#### 2. 고객 주소 필드 추가
-**파일 수정:**
-- `src/app/(dashboard)/customers/CustomerModal.tsx` - address 입력 필드 추가
-- `src/lib/actions.ts` - `createCustomer`, `updateCustomer`에 address 추가
-
-**적용 내용:**
-- 고객 등록/수정 시 주소 입력 가능
-- 택배 발송 기능 대비
-
-#### 3. POS 화면 UI 개선
-**파일 수정:**
-- `src/app/(dashboard)/pos/page.tsx` - 고객 검색 및 바코드 스캔 개선
-
-**고객 검색 개선:**
-- 기존: 콤보박스로 전체 고객 선택 (불편)
-- 개선: 이름 또는 휴대폰 뒷자리로 실시간 검색
-- 동명이인 경우 드롭다운에서 선택
-- 선택된 고객 표시 (등급 배지 포함)
-
-**바코드 리더기 지원:**
-- 전용 바코드 입력 필드 추가
-- Enter 키 인식으로 자동 제품 추가
-- 마지막 스캔 바코드 표시
-- 바코드 → 제품 매핑용 HashMap 최적화
-
-#### 4. 알림톡 템플릿 관리 → 코드 메뉴 이동
-**파일 수정:**
-- `supabase/schema.sql` - `notification_templates` 테이블 추가 (RLS, 인덱스 포함)
-- `src/app/(dashboard)/system-codes/page.tsx` - 알림톡 템플릿 탭 추가
-
-**적용 내용:**
-- 알림톡 템플릿을 시스템 코드 관리 페이지에서 관리
-- 템플릿 CRUD (코드, 이름, 메시지, 변수 지원)
-- `notifications` 테이블에 `template_id`, `sent_by` 필드 추가
-
-#### 5. SMS/알림톡 단체 발송 UI
-**파일 수정:**
-- `src/app/(dashboard)/notifications/page.tsx` - 전면 개편
-
-**적용 내용:**
-- 알림톡 발송 / SMS 발송 탭 분리
-- 단체 발송 / 단일 발송 모드
-- 고객 검색 후 체크박스로 다중 선택
-- 알림톡: 등록된 템플릿 선택 또는 직접 입력
-- SMS: 직접 메시지 입력
-- 발송 이력 테이블 (유형별 구분)
-
-### 2026-04-01
-
-#### 1. Cafe24 연동 구현 (FR-M01, FR-M02)
-**파일 생성:**
-- `src/lib/cafe24/types.ts` - Cafe24 API 타입 정의
-- `src/lib/cafe24/client.ts` - Cafe24 API 클라이언트 (OAuth, REST API)
-- `src/lib/cafe24/webhook.ts` - Webhook 핸들러 (주문 생성/상태변경)
-- `src/app/api/webhooks/cafe24/route.ts` - Webhook API 엔드포인트
-- `doc/CAFE24_SETUP.md` - Cafe24 연동 설정 가이드
-
-**구현 기능:**
-- Webhook으로 주문 생성 이벤트 수신 → `sales_orders` 테이블에 자동 저장
-- `order.shipped` → SHIPPED, `order.delivered` → COMPLETED, `order.cancelled` → CANCELLED
-- 고객 `cafe24_member_id` 매핑
-- 모든 동기화 로그 `cafe24_sync_logs`에 기록
-
-**API 수정 사항 (Cafe24 공식 문서 기준):**
-- 응답 형식: `{ resource: { ... } }` 구조 반영
-- Admin API 엔드포인트: `/admin/orders` 사용
-- Rate Limit: Leaky Bucket (1초 2회)
-
-#### 3. 폼 입력 검증 로직 추가
-
-**파일 생성:**
-- `src/lib/validators.ts` - 공통 검증 유틸리티
-
-**검증 규칙:**
-| 필드 | 검증 타입 | 설명 |
-|------|----------|------|
-| 전화번호 | `phone` | 01x-xxxx-xxxx 형식, 자동 포맷팅 |
-| 이메일 | `email` | 이메일 형식 검증 |
-| 필수값 | `required` | 빈 값 체크 |
-| 양수 정수 | `positiveInteger` | 0 이상 정수 |
-| 코드 | `code` | 영문, 숫자, -,_만 허용 |
-
-**適용된 폼:**
-- CustomerModal: 전화번호 자동 포맷팅 + 검증
-- ProductModal: 필수값, 코드포맷, 가격 검증
-- InventoryModal: 수량 검증
-- NotificationsPage: 전화번호 검증
-- ProductionPage: 생산 수량 검증
-
-#### 4. 시스템 코드 관리 페이지 추가
-
-**파일 생성:**
-- `src/app/(dashboard)/system-codes/page.tsx` - 시스템 코드 관리 페이지
-- `supabase/schema.sql` - customer_grades 테이블 추가
-
-**구현 기능:**
-| 구분 | 기능 |
-|------|------|
-| **지점 관리** | CRUD - 지점명, 코드, 채널(한약국/백화점/자사몰/이벤트), 연락처, 주소 |
-| **고객 등급** | CRUD - 코드, 이름, 설명, 색상, 정렬순서 (NORMAL/VIP/VVIP) |
-| **고객 태그** | CRUD - 이름, 설명, 색상 |
-| **카테고리** | CRUD - 이름, 상위카테고리(계층형), 정렬순서 |
-
-**DB 변경:** `customer_grades` 테이블 추가 (NORMAL, VIP, VVIP 기본 데이터)
-
-#### 2. 대시보드 고도화 (FR-D01~D05)
-**파일 생성:**
-- `src/app/(dashboard)/DashboardClient.tsx` - 대시보드 클라이언트 컴포넌트
-- `src/app/api/dashboard/route.ts` - 대시보드 데이터 API
-
-**구현 기능:**
-- **FR-D01**: 채널 필터 + 채널별 매출 위젯 (한약국/백화점/자사몰/이벤트)
-- **FR-D02**: 지점별 재고 상태 표시 (정상/부족)
-- **FR-D03**: 채널별 매출 비교
-- **FR-D04**: 본사 뷰 ↔ 지점 뷰 토글
-- **FR-D05**: 자사몰 온라인 매출 별도 표시 + 온라인 주문 배지
-
-**UI 개선:**
-```
-[본사 뷰] [지점 뷰]    [전체] [한약국] [백화점] [자사몰] [이벤트]
-┌──────────────────────────────────────────────────────────┐
-│ 오늘매출 │ 이번달매출 │ 자사몰매출 │ 재고부족 │ 전체채널매출  │
-├──────────────────────────────────────────────────────────┤
-│ 채널별매출 │ 지점별재고 │ 최근주문(온라인배지)             │
-├──────────────────────────────────────────────────────────┤
-│ 재고부족 품목 그리드                                     │
-└──────────────────────────────────────────────────────────┘
-```
-
-#### 5. 반응형 레이아웃 개선
-
-**모바일/태블릿/데스크탑 대응:**
-- 모바일: 햄버거 메뉴, 사이드바 drawer 형태
-- 태블릿: 적응형 그리드
-- 데스크탑: 고정 사이드바 + 콘텐츠 영역
-
-#### 6. Phase 2 CRM 구현 (FR-C01~C05)
-
-**파일 생성:**
-- `src/app/(dashboard)/customers/[id]/page.tsx` - 고객 상세 페이지
-
-**구현 기능:**
-| FR | 기능 | 경로 |
-|----|------|------|
-| FR-C01 | 고객별 구매 이력 통합 조회 | `/customers/[id]` - 구매 탭 |
-| FR-C02 | 고객별 상담 기록 추가/조회 | `/customers/[id]` - 상담 기록 탭 |
-| FR-C03 | VIP 고객 태그 관리 | `/customers/[id]` - 태그 위젯 |
-| FR-C05 | 담당자 지정/변경 | `/customers/[id]` - 담당자 지정 |
-
-**고객 상세 페이지 기능:**
-- 기본 정보 (이름, 연락처, 이메일, 등급, 담당지점)
-- 구매 요약 (총 구매 횟수, 총 금액)
-- 태그 관리 (추가/삭제)
-- 구매 이력 탭 (최근 20건)
-- 상담 기록 탭 (유형별 상담 추가)
-
-**DB 변경:**
-```sql
-ALTER TABLE customers ADD COLUMN assigned_to UUID REFERENCES users(id);
-```
-
-#### 3. 환경변수 업데이트
-`.env.local.example`에 Cafe24 관련 환경변수 추가:
-```bash
-CAFE24_MALL_ID=your_cafe24_mall_id
-CAFE24_CLIENT_ID=your_cafe24_client_id
-CAFE24_CLIENT_SECRET=your_cafe24_client_secret
-CAFE24_SHOP_NO=1
-```
+**발급:** https://developers.tosspayments.com > 내 상점 > API 키
 
 ---
 
-## 파일 구조
+## 데이터베이스 마이그레이션 현황
+
+> Supabase SQL Editor에서 순서대로 실행해야 합니다.
+
+| 파일 | 내용 | 실행 상태 |
+|------|------|----------|
+| `supabase/schema.sql` | 전체 기본 스키마 | ✅ 완료 |
+| `supabase/migrations/001_purchase_returns.sql` | 매입(공급업체/발주/입고) + 환불 테이블 | ✅ 완료 |
+| `supabase/migrations/002_accounting.sql` | 회계 테이블 (gl_accounts, journal_entries) + 계정과목 15개 시드 | ✅ 완료 |
+| `supabase/migrations/003_production.sql` | production_orders에 branch_id, started_at 컬럼 추가 | ✅ 완료 |
+| `supabase/migrations/004_security.sql` | session_tokens, audit_logs 테이블 | ✅ 완료 |
+| `supabase/migrations/005_notifications.sql` | notifications에 external_message_id, error_message, sent_by 추가 | ✅ 완료 |
+
+---
+
+## 구현 완료 모듈
+
+### 운영 ERP
+
+#### 대시보드 `/`
+- 오늘 매출 / 이번달 매출 / 자사몰 매출 / 재고 부족 / 이번달 매입 / 이번달 환불 카드
+- 채널별 매출, 지점별 재고 상태, 최근 주문 위젯
+- 역할별 뷰 전환 (본사/지점), BRANCH_STAFF는 자기 지점만 고정 표시
+
+#### POS `/pos`
+- 바코드 스캔, 고객 검색(이름/전화번호 뒷자리), 포인트 사용/적립
+- 재고 자동 차감, 영수증 출력(프린트 팝업)
+- 환불 처리 (품목별 수량 선택, 이유/방법 선택, 역재고 복원, 포인트 조정)
+
+#### 매입 관리 `/purchases`
+- 공급업체 CRUD `/purchases/suppliers`
+- 발주서 생성/확정/취소, 발주서 상세 `/purchases/[id]`
+- 입고 처리 (부분 입고 지원, 재고 자동 증가, 자동 분개 생성)
+- 상태 워크플로우: DRAFT → CONFIRMED → PARTIALLY_RECEIVED → RECEIVED → CANCELLED
+
+#### 생산 관리 `/production`
+- BOM 등록/삭제 (완제품 + 원재료 + 소요량)
+- 생산 지시 워크플로우: PENDING → IN_PROGRESS → COMPLETED
+- 완료 시 원재료 재고 차감 + 완제품 재고 증가 + inventory_movements 기록
+- 재료 소요량 미리보기 (부족 원재료 빨간색 표시, 예상 원가 계산)
+
+#### 재고 관리 `/inventory`
+- 지점별 재고 현황, 수동 조정
+- 재고 실사 `/inventory/count` (ADJUST 이동 기록)
+
+#### 제품 관리 `/products`
+- CRUD, 바코드, 코드 자동생성
+- 제품 생성 시 전 활성 지점에 재고 레코드 자동 생성
+
+### CRM / 고객
+
+#### 고객 목록 `/customers`
+- 이름/전화번호 검색, 등급 필터
+- 자동 등급 업그레이드 (누적 구매 100만→VIP, 300만→VVIP)
+
+#### 고객 상세 `/customers/[id]`
+- 기본 정보, 태그 관리, 포인트 이력
+- 구매 이력 (주문별 accordion, 취소/환불 구분 표시)
+- 상담 기록 5종 (상담/클레임/건강/견적/기타)
+
+#### 고객 분석 `/customers/analytics`
+- **RFM 세그멘테이션** 7단계 (최우수/충성/잠재충성/신규/이탈위험/유지필수/이탈)
+  - R(최신성) · F(빈도) · M(금액) 5점 척도 점수 + 도트 시각화
+  - 세그먼트 카드 클릭으로 고객 필터링
+- **재구매 주기** 분포 바 차트 + 평균 주기 + 짧은 주기 Top 10
+- **이탈 위험 고객** (60일+ 미방문, 2회↑ 구매) LTV 순 정렬, SMS 바로 발송 링크
+
+### 보고서 / 회계
+
+#### 보고서 `/reports`
+- **매출 탭** — 기간/채널/지점 필터, 채널별/지점별 매출 바, 인기 제품, PDF 다운로드
+- **매입 탭** — 발주 내역, 환불 내역
+- **손익 요약 탭** — 간이 손익계산서 (총매출 → 환불 → 순매출)
+- **월별 트렌드 탭** — SVG 이중 바 차트(매출/이익), 12개월 상세 테이블 + 마진율
+- **제품별 마진 탭** — 매출/이익/마진율 정렬, 마진율 필터, 원가 미등록 시 경고
+
+#### 회계 `/accounting`
+- 계정과목 목록, 분개 목록 (자동/수동)
+- 총계정원장 (계정별 잔액 추이)
+- P&L 계산 (운영 테이블 직접 집계: 매출 - 할인 - 환불 - COGS)
+- 수동 분개 입력 (대차 일치 실시간 검증)
+- 자동 분개: 판매 시 (매출인식), 입고 시 (재고자산/미지급금)
+
+### 알림 `/notifications`
+
+- SMS / 알림톡 탭 분리
+- 단체 발송 (고객 검색 + 체크박스) / 단일 발송
+- **Solapi API 연동 완료** (실제 발송은 환경변수 설정 필요 — 위 참조)
+- 발송 이력 (성공/실패 모두 기록, error_message 저장)
+- 알림톡 템플릿 관리 `/notifications/templates`
+
+### 보안
+
+- **세션 토큰 DB 저장** — 로그인 시 `session_tokens` 테이블에 저장, 로그아웃 시 삭제 (서버 측 무효화 가능)
+- **감사 로그** — `audit_logs` 테이블 (로그인/로그아웃/환불/생산/입고 이력)
+- **서버 액션 인증 게이트** — `requireSession()` 적용 (환불, 생산 지시, 입고 처리)
+- `src/lib/session.ts` — `getSession()`, `requireSession()`, `requireRole()`, `writeAuditLog()` 헬퍼
+
+### 연동
+
+- **Cafe24 웹훅** — 주문 자동 수집, 상태 업데이트, `cafe24_sync_logs` 기록
+- **AI 에이전트** `/api/agent` — Function Calling 12종 도구, 다턴 히스토리
+
+### 권한 관리
+
+- 5개 역할: `SUPER_ADMIN`, `HQ_OPERATOR`, `PHARMACY_STAFF`, `BRANCH_STAFF`, `EXECUTIVE`
+- `screen_permissions` 테이블 기반 메뉴 접근 제어
+- BRANCH_STAFF / PHARMACY_STAFF: 지점 선택 고정, 타 지점 데이터 차단
+
+---
+
+## 미결 / 향후 작업
+
+### 발주사와 회의 후 방향 결정 필요
+
+#### 고객용 앱 `src/app/(customer)/`
+- **목적 미확정** — 발주사와 협의 필요
+- 후보 기능:
+  - 포인트 잔액 + 이력 조회 (오프라인 채널 포함, Cafe24에는 없음)
+  - 등급 현황 + 다음 등급까지 잔여 금액
+  - 전 채널 구매 이력 통합
+  - 건강 기록 / 상담 이력 열람 (노출 범위는 운영 정책 결정 필요)
+- 인증 방식도 결정 필요 (SMS 본인인증 vs 로그인 없이 전화번호 조회 등)
+
+#### 토스페이먼트 PG 연동
+- POS 카드 결제 → `POST /v1/payments/key-in`
+- 결제 취소 → `POST /v1/payments/{paymentKey}/cancel`
+- 필요 DB 필드: `sales_orders`에 `pg_provider`, `pg_transaction_id`, `pg_accept_no`, `pg_card_company`, `pg_status`
+- **선행 조건**: 토스페이먼트 API 키 발급 필요
+
+### 기술 부채
+
+- POS 결제 로직이 client-side Supabase 직접 호출 → 서버 액션으로 이전 권장
+- `src/lib/actions.ts` 단일 파일 비대 → 도메인별 분리 검토
+
+---
+
+## 파일 구조 (주요)
 
 ```
 src/
 ├── app/
 │   ├── (dashboard)/
-│   │   ├── page.tsx                    # 대시보드 (개선됨)
-│   │   ├── DashboardClient.tsx         # 대시보드 클라이언트 (신규)
-│   │   ├── pos/page.tsx                # POS
-│   │   ├── products/page.tsx           # 제품 관리
-│   │   ├── customers/page.tsx          # 고객 관리
-│   │   ├── inventory/page.tsx           # 재고 관리
-│   │   ├── production/page.tsx          # 생산 관리
-│   │   ├── notifications/page.tsx       # 알림톡
-│   │   └── branches/page.tsx            # 지점 관리
+│   │   ├── page.tsx                         # 대시보드
+│   │   ├── DashboardClient.tsx
+│   │   ├── pos/
+│   │   │   ├── page.tsx                     # POS
+│   │   │   ├── ReceiptModal.tsx             # 영수증 출력
+│   │   │   └── RefundModal.tsx              # 환불 처리
+│   │   ├── purchases/
+│   │   │   ├── page.tsx                     # 발주 목록
+│   │   │   ├── [id]/page.tsx                # 발주 상세
+│   │   │   └── suppliers/page.tsx           # 공급업체
+│   │   ├── production/page.tsx              # 생산 관리
+│   │   ├── inventory/
+│   │   │   ├── page.tsx
+│   │   │   └── count/page.tsx              # 재고 실사
+│   │   ├── customers/
+│   │   │   ├── page.tsx
+│   │   │   ├── [id]/page.tsx               # 고객 상세
+│   │   │   └── analytics/page.tsx          # 고객 분석 (RFM 등)
+│   │   ├── reports/page.tsx                 # 보고서 (5탭)
+│   │   ├── accounting/page.tsx              # 회계
+│   │   └── notifications/
+│   │       ├── page.tsx                     # SMS/알림톡 발송
+│   │       └── templates/page.tsx          # 템플릿 관리
 │   ├── api/
-│   │   ├── dashboard/route.ts           # 대시보드 API (신규)
-│   │   ├── payments/
-│   │   │   └── toss/route.ts           # 토스페이먼트 PG 연동 (예정)
-│   │   └── webhooks/
-│   │       └── cafe24/route.ts         # Cafe24 Webhook (신규)
+│   │   ├── dashboard/route.ts
+│   │   └── webhooks/cafe24/route.ts
 │   └── login/
 ├── lib/
-│   ├── cafe24/
-│   │   ├── types.ts                    # Cafe24 타입 (신규)
-│   │   ├── client.ts                   # Cafe24 API 클라이언트 (신규)
-│   │   └── webhook.ts                  # Webhook 핸들러 (신규)
-│   └── supabase/
-└── middleware.ts
+│   ├── actions.ts                           # 공통 서버 액션 (제품/고객/시스템코드)
+│   ├── purchase-actions.ts                  # 매입 서버 액션
+│   ├── return-actions.ts                    # 환불 서버 액션
+│   ├── production-actions.ts               # 생산 서버 액션
+│   ├── accounting-actions.ts               # 회계 서버 액션
+│   ├── notification-actions.ts             # 알림 서버 액션
+│   ├── customer-analytics-actions.ts       # 고객 분석 서버 액션
+│   ├── session.ts                          # 세션 검증 / 감사 로그 헬퍼
+│   ├── solapi/client.ts                    # Solapi SMS/알림톡 API 클라이언트
+│   ├── cafe24/                             # Cafe24 연동
+│   └── supabase/                           # Supabase 클라이언트
 
 supabase/
-└── schema.sql                          # DB 스키마
+├── schema.sql                              # 전체 기본 스키마
+└── migrations/
+    ├── 001_purchase_returns.sql
+    ├── 002_accounting.sql
+    ├── 003_production.sql
+    ├── 004_security.sql
+    └── 005_notifications.sql
 
 doc/
-├── 경옥채_사내통합시스템_PRD_v1.0.docx
-├── 경옥채_사내통합시스템_TDD_v1.0.docx
-└── CAFE24_SETUP.md                     # Cafe24 설정 가이드 (신규)
+├── PROGRESS.md                             # 이 파일
+├── CAFE24_SETUP.md                         # Cafe24 설정 가이드
+├── 작업계획_2026-04-03.md
+└── (PRD/TDD 문서들)
 ```
 
 ---
 
-## Vercel 환경변수 설정 (필수)
+## Git 커밋 이력 (주요)
 
-Vercel Dashboard → 프로젝트 → Settings → Environment Variables에서 다음 추가:
-
-| Name | Value | 비고 |
-|------|-------|------|
-| `NEXT_PUBLIC_SUPABASE_URL` | `https://xxx.supabase.co` | Supabase 프로젝트 URL |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | `eyJ...` | Supabase anon key |
-| `CAFE24_MALL_ID` | `yourmall` | 자사몬 몰 ID |
-| `CAFE24_CLIENT_ID` | `BrIfqEKoPxeE...` | Cafe24 앱 Client ID |
-| `CAFE24_CLIENT_SECRET` | `xxx...` | Cafe24 앱 Client Secret |
-| `CAFE24_SHOP_NO` | `1` | 멀티쇼핑몰 번호 |
-| **`NEXT_PUBLIC_TOSS_CLIENT_KEY`** | `ck_test_xxx` | **토스페이먼트 (발급 필요)** |
-| **`TOSS_SECRET_KEY`** | `sk_test_xxx` | **토스페이먼트 (발급 필요)** |
-
----
-
-## 데이터베이스 테이블
-
-| 테이블 | 용도 |
-|--------|------|
-| `branches` | 매장/지점 관리 |
-| `users` | 회원/직원 관리 |
-| `products` | 제품(품목) 관리 |
-| `product_bom` | BOM (Bill of Materials) |
-| `inventories` | 매장별 재고 |
-| `inventory_movements` | 재고 입출고 이력 |
-| `customers` | 고객 관리 |
-| `customer_consultations` | 고객 상담 기록 |
-| `customer_tags` | 고객 태그 분류 |
-| `customer_tag_map` | 고객-태그 매핑 |
-| `sales_orders` | 판매 전표 |
-| `sales_order_items` | 판매 전표 항목 |
-| `point_history` | 적립금 내역 |
-| `production_orders` | 생산 지시서 |
-| `seasons` | 시즌 관리 |
-| `notifications` | 알림톡 내역 |
-| `cafe24_sync_logs` | Cafe24 동기화 로그 |
-
----
-
-## 알려진 문제점
-
-1. **ESLint 에러**: 기존 파일들에서 `any` 타입 사용 및 `useEffect` 내 setState 관련 경고 (수정 필요)
-2. **Cafe24 연동**: 실제 연동을 위해 Cafe24 개발자센터에서 앱 설정 필요
-3. **notification-actions.ts**: Supabase 타입 에러 발생 중
-4. **토스페이먼트 연동**: API 키 발급 필요 (아래 참조)
-
----
-
-## 토스페이먼트 API 키 발급
-
-### 발급 방법
-1. **개발자센터 접속**: https://developers.tosspayments.com/
-2. **내 상점** 선택 또는 등록
-3. **API 키** 탭에서 확인
-
-### 필요 키 (아직 미설정)
-| 키 | 용도 | 예시 |
-|----|------|------|
-| `NEXT_PUBLIC_TOSS_CLIENT_KEY` | Frontend SDK용 | `ck_test_xxxxxxxx` |
-| `TOSS_SECRET_KEY` | Server API 호출용 | `sk_test_xxxxxxxx` |
-
-### 환경설정 (Vercel에 추가 필요)
-```bash
-NEXT_PUBLIC_TOSS_CLIENT_KEY=ck_test_xxx
-TOSS_SECRET_KEY=sk_test_xxx
-TOSS_IS_PRODUCTION=false
-```
-
----
-
-## Git 커밋 이력
-
-| 날짜 | 내용 |
+| 커밋 | 내용 |
 |------|------|
-| 2026-04-02 | 역할별 지점 권한 적용 + 채널 필터 숨김 |
-| 2026-04-02 | 토스페이먼트 PG 연동 검토 |
-| 2026-04-01 | Cafe24 연동 + 대시보드 고도화 |
-| (이전) | Phase 1 기본 기능 (ERP, POS, 제품/고객/재고/생산 관리) |
-
----
-
-## 다음 작업
-
-### 즉시 (PG 연동 준비)
-1. **토스페이먼트 API 키 발급** - 개발자센터에서 `ck_test_`, `sk_test_` 키 확인
-2. **Vercel 환경변수 추가** - `NEXT_PUBLIC_TOSS_CLIENT_KEY`, `TOSS_SECRET_KEY`
-3. **DB 필드 추가** - `sales_orders` 테이블에 PG 필드 추가
-
-### 단기 (PG 연동 구현)
-4. **토스페이먼트 SDK 설치** - `npm install @tosspayments/sdk`
-5. **API 라우트 생성** - `/api/payments/toss/key-in`
-6. **POS 카드 결제 연동** - 카드번호 입력 → PG 승인 → 완료
-7. **결제 취소 연동** - `POST /v1/payments/{paymentKey}/cancel`
-
-### 중기 (고도화)
-8. **현금 결제** - 거스름돈 계산
-9. **PG 필드 활용** - Dashboard에서 카드/현금 구분 표시
-10. **ESLint 수정** - any 타입 및 useEffect 경고 해결
+| `8cadf2e` | 고객 분석 — RFM 세그멘테이션, 재구매 주기, 이탈 위험 |
+| `e8d4c28` | 손익 고도화 — 월별 트렌드 SVG 차트, 제품별 마진 분석 |
+| `b9b0028` | Solapi SMS/알림톡 API 실제 연동 |
+| `2a274e0` | 보안 강화 — session_tokens DB 저장, audit_logs, requireSession() |
+| `494846c` | 003_production 마이그레이션 컬럼명 오류 수정 |
+| `373c858` | 생산 관리 전면 개편 — branch_id 버그 수정, 3단계 워크플로우 |
+| `afa157e` | 매입/환불/회계/재고실사/고객분석/보고서 등 대규모 기능 추가 |
