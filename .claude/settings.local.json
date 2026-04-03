@@ -34,7 +34,11 @@
       "Bash(where chrome:*)",
       "Bash(node -e \"require\\(''puppeteer''\\); console.log\\(''ok''\\)\")",
       "Bash(node scripts/generate-prd-v2.js)",
-      "Bash(npm run:*)"
+      "Bash(npm run:*)",
+      "Bash(ls:*)",
+      "Bash(python3:*)",
+      "Bash(node scripts/append-report-components.mjs)",
+      "Bash(grep -E \"\\\\.\\(tsx?|jsx?\\)$\")"
     ]
   }
 }

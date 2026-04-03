@@ -183,8 +183,30 @@ export const AGENT_TOOLS: MiniMaxTool[] = [
   {
     type: 'function',
     function: {
+      name: 'bulk_adjust_inventory',
+      description: '여러 지점/제품을 한 번에 재고 조정합니다. "모든 점포", "전체 제품" 같은 대량 작업에 사용. branch_name 또는 product_name을 생략하면 전체 대상으로 처리됩니다.',
+      parameters: {
+        type: 'object',
+        properties: {
+          branch_name: { type: 'string', description: '지점명. 생략하면 전체 지점 대상.' },
+          product_name: { type: 'string', description: '제품명. 생략하면 전체 제품 대상.' },
+          movement_type: {
+            type: 'string',
+            enum: ['IN', 'OUT', 'ADJUST'],
+            description: 'IN=입고(현재+수량), OUT=출고(현재-수량), ADJUST=실사(현재=수량으로 덮어씀)',
+          },
+          quantity: { type: 'number', description: '수량 (각 항목에 동일하게 적용)' },
+          memo: { type: 'string', description: '사유 (선택)' },
+        },
+        required: ['movement_type', 'quantity'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
       name: 'adjust_inventory',
-      description: '특정 지점의 재고를 입고(+), 출고(-), 실사(=) 방식으로 조정합니다.',
+      description: '특정 지점의 특정 제품 1건 재고를 입고(+), 출고(-), 실사(=) 방식으로 조정합니다. 단일 건에만 사용하고, 여러 지점/제품이면 bulk_adjust_inventory를 사용하세요.',
       parameters: {
         type: 'object',
         properties: {
@@ -470,9 +492,95 @@ export const AGENT_TOOLS: MiniMaxTool[] = [
       },
     },
   },
+  {
+    type: 'function',
+    function: {
+      name: 'bulk_send_sms',
+      description: '특정 등급 또는 전체 고객에게 동일한 SMS를 일괄 발송합니다. 프로모션, 공지사항 등에 사용.',
+      parameters: {
+        type: 'object',
+        properties: {
+          grade: { type: 'string', enum: ['NORMAL', 'VIP', 'VVIP', 'ALL'], description: '발송 대상 등급. ALL이면 전체 고객.' },
+          message: { type: 'string', description: '발송할 SMS 내용' },
+          branch_name: { type: 'string', description: '특정 지점 담당 고객만 발송 시 지점명' },
+        },
+        required: ['grade', 'message'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'create_and_confirm_purchase_order',
+      description: '발주서를 작성하고 즉시 확정합니다. "발주하고 확정까지 해줘" 요청에 사용.',
+      parameters: {
+        type: 'object',
+        properties: {
+          supplier_name: { type: 'string', description: '공급업체 이름 키워드' },
+          branch_name: { type: 'string', description: '입고 지점명' },
+          product_name: { type: 'string', description: '발주 제품명 키워드' },
+          quantity: { type: 'number', description: '발주 수량' },
+          unit_price: { type: 'number', description: '단가 (원)' },
+          memo: { type: 'string', description: '메모' },
+        },
+        required: ['supplier_name', 'branch_name', 'product_name', 'quantity', 'unit_price'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'replenish_low_stock',
+      description: '안전재고 미달 품목을 자동으로 보충합니다. 안전재고 수준까지 채우거나 지정 수량만큼 입고 처리.',
+      parameters: {
+        type: 'object',
+        properties: {
+          branch_name: { type: 'string', description: '지점명 (생략 시 전체 지점)' },
+          fill_to_safety: { type: 'boolean', description: '안전재고 수준까지 채우기 (기본 true). false면 fixed_quantity 사용.' },
+          fixed_quantity: { type: 'number', description: 'fill_to_safety가 false일 때 각 품목에 입고할 고정 수량' },
+          memo: { type: 'string', description: '메모' },
+        },
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'get_top_products',
+      description: '기간별 판매량/매출액 상위 제품을 조회합니다.',
+      parameters: {
+        type: 'object',
+        properties: {
+          start_date: { type: 'string', description: '조회 시작일 YYYY-MM-DD (기본: 이번 달 1일)' },
+          end_date: { type: 'string', description: '조회 종료일 YYYY-MM-DD (기본: 오늘)' },
+          limit: { type: 'number', description: '상위 N개 (기본 10)' },
+          branch_name: { type: 'string', description: '지점 필터 (생략 시 전체)' },
+        },
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'compare_sales',
+      description: '두 기간의 매출을 비교합니다. "이번달 vs 지난달", "이번주 vs 지난주" 등의 요청에 사용.',
+      parameters: {
+        type: 'object',
+        properties: {
+          period1_start: { type: 'string', description: '비교 기간1 시작일 YYYY-MM-DD' },
+          period1_end: { type: 'string', description: '비교 기간1 종료일 YYYY-MM-DD' },
+          period2_start: { type: 'string', description: '비교 기간2 시작일 YYYY-MM-DD' },
+          period2_end: { type: 'string', description: '비교 기간2 종료일 YYYY-MM-DD' },
+          branch_name: { type: 'string', description: '지점 필터 (생략 시 전체)' },
+        },
+        required: ['period1_start', 'period1_end', 'period2_start', 'period2_end'],
+      },
+    },
+  },
 ];
 
 export const WRITE_TOOLS = new Set([
+  'bulk_adjust_inventory',
   'adjust_inventory',
   'transfer_inventory',
   'create_customer',
@@ -490,6 +598,9 @@ export const WRITE_TOOLS = new Set([
   'start_production_order',
   'complete_production_order',
   'send_sms',
+  'bulk_send_sms',
+  'create_and_confirm_purchase_order',
+  'replenish_low_stock',
 ]);
 
 // ─── Shared Helpers ──────────────────────────────────────────────────────────
@@ -535,6 +646,7 @@ export async function executeTool(toolName: string, args: Record<string, any>, s
       case 'get_suppliers':            return execGetSuppliers(sb, args);
       case 'get_purchase_orders':      return execGetPurchaseOrders(sb, args);
       case 'get_production_orders':    return execGetProductionOrders(sb, args);
+      case 'bulk_adjust_inventory':     return execBulkAdjustInventory(sb, args as any);
       case 'adjust_inventory':         return execAdjustInventory(sb, args as any);
       case 'transfer_inventory':       return execTransferInventory(sb, args as any);
       case 'create_customer':          return execCreateCustomer(sb, args as any);
@@ -552,6 +664,11 @@ export async function executeTool(toolName: string, args: Record<string, any>, s
       case 'start_production_order':   return execStartProductionOrder(sb, args as any);
       case 'complete_production_order':return execCompleteProductionOrder(sb, args as any);
       case 'send_sms':                 return execSendSms(sb, args as any);
+      case 'bulk_send_sms':            return execBulkSendSms(sb, args as any);
+      case 'create_and_confirm_purchase_order': return execCreateAndConfirmPurchaseOrder(sb, args as any);
+      case 'replenish_low_stock':      return execReplenishLowStock(sb, args as any);
+      case 'get_top_products':         return execGetTopProducts(sb, args as any);
+      case 'compare_sales':            return execCompareSales(sb, args as any);
       default: return JSON.stringify({ error: `알 수 없는 도구: ${toolName}` });
     }
   } catch (e: any) {
@@ -904,6 +1021,91 @@ async function execGetProductionOrders(sb: any, args: { status?: string; branch_
 }
 
 // ── 재고 쓰기 ────────────────────────────────────────────────────────────────
+
+async function execBulkAdjustInventory(sb: any, args: {
+  branch_name?: string;
+  product_name?: string;
+  movement_type: string;
+  quantity: number;
+  memo?: string;
+}): Promise<string> {
+  // 대상 지점 목록
+  let branchesQ = sb.from('branches').select('id, name').eq('is_active', true);
+  if (args.branch_name) branchesQ = branchesQ.ilike('name', `%${args.branch_name}%`);
+  const { data: branches } = await branchesQ;
+  if (!branches?.length) return JSON.stringify({ error: '대상 지점이 없습니다.' });
+
+  // 대상 제품 목록
+  let productsQ = sb.from('products').select('id, name').eq('is_active', true);
+  if (args.product_name) productsQ = productsQ.ilike('name', `%${args.product_name}%`);
+  const { data: products } = await productsQ;
+  if (!products?.length) return JSON.stringify({ error: '대상 제품이 없습니다.' });
+
+  const typeLabel: Record<string, string> = { IN: '입고', OUT: '출고', ADJUST: '실사' };
+  const memo = args.memo || `AI 대량 ${typeLabel[args.movement_type] || args.movement_type}`;
+
+  let successCount = 0;
+  let failCount = 0;
+  const errors: string[] = [];
+
+  for (const branch of branches as any[]) {
+    for (const product of products as any[]) {
+      try {
+        const { data: inv } = await sb.from('inventories')
+          .select('id, quantity')
+          .eq('branch_id', branch.id)
+          .eq('product_id', product.id)
+          .single();
+
+        const current = (inv as any)?.quantity ?? 0;
+        let newQty: number;
+
+        if (args.movement_type === 'IN') {
+          newQty = current + args.quantity;
+        } else if (args.movement_type === 'OUT') {
+          if (current < args.quantity) {
+            errors.push(`${branch.name}/${product.name}: 재고 부족 (현재 ${current}개)`);
+            failCount++;
+            continue;
+          }
+          newQty = current - args.quantity;
+        } else {
+          newQty = args.quantity; // ADJUST
+        }
+
+        if (inv) {
+          await sb.from('inventories').update({ quantity: newQty }).eq('id', (inv as any).id);
+        } else {
+          await sb.from('inventories').insert({
+            branch_id: branch.id, product_id: product.id, quantity: newQty, safety_stock: 0,
+          });
+        }
+
+        await sb.from('inventory_movements').insert({
+          branch_id: branch.id, product_id: product.id,
+          movement_type: args.movement_type,
+          quantity: args.movement_type === 'OUT' ? -args.quantity : args.quantity,
+          memo,
+        });
+
+        successCount++;
+      } catch (e: any) {
+        errors.push(`${branch.name}/${product.name}: ${e.message}`);
+        failCount++;
+      }
+    }
+  }
+
+  return JSON.stringify({
+    성공: true,
+    메시지: `대량 재고 ${typeLabel[args.movement_type] || args.movement_type} 완료`,
+    대상지점수: branches.length,
+    대상제품수: products.length,
+    처리성공: `${successCount}건`,
+    처리실패: failCount > 0 ? `${failCount}건` : '없음',
+    오류상세: errors.length > 0 ? errors.slice(0, 5) : undefined,
+  });
+}
 
 async function execAdjustInventory(sb: any, args: { branch_name: string; product_name: string; movement_type: string; quantity: number; memo?: string }): Promise<string> {
   const branch = await findBranch(sb, args.branch_name);
@@ -1454,4 +1656,279 @@ async function execSendSms(sb: any, args: { customer_name?: string; phone?: stri
   } catch (e: any) {
     return JSON.stringify({ error: `발송 오류: ${e.message}` });
   }
+}
+
+// ── 일괄 SMS ─────────────────────────────────────────────────────────────────
+
+async function execBulkSendSms(sb: any, args: { grade: string; message: string; branch_name?: string }): Promise<string> {
+  let q = sb.from('customers').select('id, name, phone, grade').eq('is_active', true);
+  if (args.grade !== 'ALL') q = q.eq('grade', args.grade);
+  if (args.branch_name) {
+    const branch = await findBranch(sb, args.branch_name);
+    if (!branch) return JSON.stringify({ error: `지점 "${args.branch_name}" 없음` });
+    q = q.eq('primary_branch_id', branch.id);
+  }
+  const { data: customers, error } = await q;
+  if (error) return JSON.stringify({ error: error.message });
+  if (!customers?.length) return JSON.stringify({ error: '발송 대상 고객이 없습니다.' });
+
+  const SOLAPI_API_KEY = process.env.SOLAPI_API_KEY;
+  const SOLAPI_API_SECRET = process.env.SOLAPI_API_SECRET;
+  const SOLAPI_SENDER = process.env.SOLAPI_SENDER_PHONE;
+
+  const now = new Date().toISOString();
+  const notifications = (customers as any[]).map(c => ({
+    customer_id: c.id,
+    type: 'SMS',
+    message: args.message,
+    status: SOLAPI_API_KEY ? 'pending' : 'sent',
+    sent_at: now,
+  }));
+
+  // DB 기록 (배치 삽입)
+  await sb.from('notifications').insert(notifications);
+
+  const gradeLabel: Record<string, string> = { NORMAL: '일반', VIP: 'VIP', VVIP: 'VVIP', ALL: '전체' };
+
+  if (!SOLAPI_API_KEY || !SOLAPI_API_SECRET || !SOLAPI_SENDER) {
+    return JSON.stringify({
+      성공: true,
+      메시지: `일괄 SMS DB 기록 완료 (실제 발송 미설정)`,
+      대상등급: gradeLabel[args.grade] || args.grade,
+      발송대상: `${customers.length}명`,
+      안내: 'Solapi 키 미설정 — DB에만 기록되었습니다.',
+    });
+  }
+
+  // Solapi 일괄 발송
+  try {
+    const date = new Date().toISOString();
+    const salt = Math.random().toString(36).substring(2, 12);
+    const { createHmac } = await import('crypto');
+    const signature = createHmac('sha256', SOLAPI_API_SECRET).update(date + salt).digest('hex');
+    const msgType = Buffer.byteLength(args.message, 'utf8') > 90 ? 'LMS' : 'SMS';
+
+    const messages = (customers as any[]).map(c => ({ to: c.phone, from: SOLAPI_SENDER, text: args.message, type: msgType }));
+
+    const res = await fetch('https://api.solapi.com/messages/v4/send-many', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `HMAC-SHA256 apiKey=${SOLAPI_API_KEY}, date=${date}, salt=${salt}, signature=${signature}`,
+      },
+      body: JSON.stringify({ messages }),
+    });
+
+    const result = await res.json() as any;
+    if (result.errorCode) return JSON.stringify({ error: `Solapi 오류: ${result.errorMessage}` });
+
+    return JSON.stringify({
+      성공: true,
+      메시지: `일괄 SMS 발송 완료`,
+      대상등급: gradeLabel[args.grade] || args.grade,
+      발송대상: `${customers.length}명`,
+    });
+  } catch (e: any) {
+    return JSON.stringify({ error: `발송 오류: ${e.message}` });
+  }
+}
+
+// ── 발주 생성+확정 ────────────────────────────────────────────────────────────
+
+async function execCreateAndConfirmPurchaseOrder(sb: any, args: {
+  supplier_name: string; branch_name: string; product_name: string;
+  quantity: number; unit_price: number; memo?: string;
+}): Promise<string> {
+  // 공급업체 조회
+  const { data: supplier } = await sb.from('suppliers').select('id, name').ilike('name', `%${args.supplier_name}%`).eq('is_active', true).limit(1).single();
+  if (!supplier) return JSON.stringify({ error: `공급업체 "${args.supplier_name}" 없음` });
+
+  const branch = await findBranch(sb, args.branch_name);
+  if (!branch) return JSON.stringify({ error: `지점 "${args.branch_name}" 없음` });
+
+  const product = await findProduct(sb, args.product_name);
+  if (!product) return JSON.stringify({ error: `제품 "${args.product_name}" 없음` });
+
+  const total = args.quantity * args.unit_price;
+  const { data: dateRow } = await sb.from('purchase_orders').select('order_number').ilike('order_number', 'PO-%').order('created_at', { ascending: false }).limit(1).single();
+  const nextNum = dateRow ? String(parseInt((dateRow as any).order_number.replace('PO-', '')) + 1).padStart(6, '0') : '000001';
+  const orderNumber = `PO-${nextNum}`;
+
+  const { error: poErr } = await sb.from('purchase_orders').insert({
+    order_number: orderNumber,
+    supplier_id: (supplier as any).id,
+    branch_id: branch.id,
+    status: 'CONFIRMED',
+    total_amount: total,
+    memo: args.memo || null,
+  });
+  if (poErr) return JSON.stringify({ error: poErr.message });
+
+  const { data: po } = await sb.from('purchase_orders').select('id').eq('order_number', orderNumber).single();
+  await sb.from('purchase_order_items').insert({
+    purchase_order_id: (po as any).id,
+    product_id: product.id,
+    ordered_quantity: args.quantity,
+    received_quantity: 0,
+    unit_price: args.unit_price,
+  });
+
+  return JSON.stringify({
+    성공: true,
+    메시지: '발주서 작성 및 확정 완료',
+    발주번호: orderNumber,
+    공급업체: (supplier as any).name,
+    지점: branch.name,
+    제품: product.name,
+    수량: args.quantity,
+    단가: args.unit_price.toLocaleString(),
+    합계: `${total.toLocaleString()}원`,
+    상태: 'CONFIRMED',
+    안내: '입고 처리는 receive_purchase_order를 사용하세요.',
+  });
+}
+
+// ── 자동 재고 보충 ────────────────────────────────────────────────────────────
+
+async function execReplenishLowStock(sb: any, args: {
+  branch_name?: string; fill_to_safety?: boolean; fixed_quantity?: number; memo?: string;
+}): Promise<string> {
+  let branchIds: string[] | null = null;
+
+  if (args.branch_name) {
+    const b = await findBranch(sb, args.branch_name);
+    if (!b) return JSON.stringify({ error: `지점 "${args.branch_name}" 없음` });
+    branchIds = [b.id];
+  }
+
+  let q = sb.from('inventories').select('id, quantity, safety_stock, branch_id, product_id, branches(name), products(name)');
+  if (branchIds) q = q.in('branch_id', branchIds);
+  const { data: allInv } = await q;
+
+  const lowItems = ((allInv || []) as any[]).filter(i => i.quantity < i.safety_stock);
+  if (!lowItems.length) return JSON.stringify({ 결과: '안전재고 미달 품목 없음 — 모든 재고가 정상입니다.' });
+
+  const fillToSafety = args.fill_to_safety !== false;
+  const memo = args.memo || 'AI 자동 재고 보충';
+  let successCount = 0;
+
+  for (const item of lowItems) {
+    const addQty = fillToSafety
+      ? item.safety_stock - item.quantity
+      : (args.fixed_quantity || item.safety_stock - item.quantity);
+
+    if (addQty <= 0) continue;
+
+    await sb.from('inventories').update({ quantity: item.quantity + addQty }).eq('id', item.id);
+    await sb.from('inventory_movements').insert({
+      branch_id: item.branch_id, product_id: item.product_id,
+      movement_type: 'IN', quantity: addQty, memo,
+    });
+    successCount++;
+  }
+
+  return JSON.stringify({
+    성공: true,
+    메시지: `부족 품목 ${successCount}개 자동 보충 완료`,
+    처리건수: successCount,
+    기준: fillToSafety ? '안전재고 수준까지' : `고정 ${args.fixed_quantity}개`,
+    상세: lowItems.slice(0, 8).map(i => {
+      const addQty = fillToSafety ? i.safety_stock - i.quantity : (args.fixed_quantity || i.safety_stock - i.quantity);
+      return `${i.branches?.name}/${i.products?.name}: +${addQty}개`;
+    }),
+  });
+}
+
+// ── 상위 제품 조회 ────────────────────────────────────────────────────────────
+
+async function execGetTopProducts(sb: any, args: { start_date?: string; end_date?: string; limit?: number; branch_name?: string }): Promise<string> {
+  const now = new Date();
+  const startDate = args.start_date || `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
+  const endDate = args.end_date || now.toISOString().slice(0, 10);
+  const limit = args.limit || 10;
+
+  let branchId: string | null = null;
+  if (args.branch_name) {
+    const b = await findBranch(sb, args.branch_name);
+    if (!b) return JSON.stringify({ error: `지점 "${args.branch_name}" 없음` });
+    branchId = b.id;
+  }
+
+  let q = sb.from('sales_order_items')
+    .select('quantity, total_price, product_id, products(name, code), sales_orders!inner(ordered_at, branch_id, status)')
+    .gte('sales_orders.ordered_at', `${startDate}T00:00:00`)
+    .lte('sales_orders.ordered_at', `${endDate}T23:59:59`)
+    .eq('sales_orders.status', 'COMPLETED');
+
+  if (branchId) q = q.eq('sales_orders.branch_id', branchId);
+
+  const { data, error } = await q;
+  if (error) return JSON.stringify({ error: error.message });
+  if (!data?.length) return JSON.stringify({ 결과: '해당 기간 판매 데이터 없음' });
+
+  // 제품별 집계
+  const map = new Map<string, { name: string; code: string; qty: number; revenue: number }>();
+  for (const item of data as any[]) {
+    const pid = item.product_id;
+    if (!map.has(pid)) map.set(pid, { name: item.products?.name || pid, code: item.products?.code || '', qty: 0, revenue: 0 });
+    const entry = map.get(pid)!;
+    entry.qty += item.quantity;
+    entry.revenue += item.total_price;
+  }
+
+  const sorted = Array.from(map.values()).sort((a, b) => b.revenue - a.revenue).slice(0, limit);
+  return JSON.stringify({
+    기간: `${startDate} ~ ${endDate}`,
+    상위제품: sorted.map((p, i) => ({
+      순위: i + 1, 제품명: p.name, 코드: p.code,
+      판매량: `${p.qty}개`,
+      매출: `${p.revenue.toLocaleString()}원`,
+    })),
+  });
+}
+
+// ── 매출 비교 ─────────────────────────────────────────────────────────────────
+
+async function execCompareSales(sb: any, args: {
+  period1_start: string; period1_end: string;
+  period2_start: string; period2_end: string;
+  branch_name?: string;
+}): Promise<string> {
+  let branchId: string | null = null;
+  if (args.branch_name) {
+    const b = await findBranch(sb, args.branch_name);
+    if (!b) return JSON.stringify({ error: `지점 "${args.branch_name}" 없음` });
+    branchId = b.id;
+  }
+
+  async function periodSummary(start: string, end: string) {
+    let q = sb.from('sales_orders')
+      .select('total_amount, discount_amount, points_used')
+      .eq('status', 'COMPLETED')
+      .gte('ordered_at', `${start}T00:00:00`)
+      .lte('ordered_at', `${end}T23:59:59`);
+    if (branchId) q = q.eq('branch_id', branchId);
+    const { data } = await q;
+    const orders = (data || []) as any[];
+    const revenue = orders.reduce((s: number, o: any) => s + (o.total_amount || 0), 0);
+    const discount = orders.reduce((s: number, o: any) => s + (o.discount_amount || 0), 0);
+    return { 건수: orders.length, 매출: revenue, 할인: discount };
+  }
+
+  const [p1, p2] = await Promise.all([
+    periodSummary(args.period1_start, args.period1_end),
+    periodSummary(args.period2_start, args.period2_end),
+  ]);
+
+  const diff = p1.매출 - p2.매출;
+  const diffPct = p2.매출 > 0 ? ((diff / p2.매출) * 100).toFixed(1) : 'N/A';
+
+  return JSON.stringify({
+    비교결과: {
+      기간1: { 날짜: `${args.period1_start} ~ ${args.period1_end}`, ...p1, 매출표시: `${p1.매출.toLocaleString()}원` },
+      기간2: { 날짜: `${args.period2_start} ~ ${args.period2_end}`, ...p2, 매출표시: `${p2.매출.toLocaleString()}원` },
+    },
+    증감: `${diff >= 0 ? '+' : ''}${diff.toLocaleString()}원 (${diff >= 0 ? '+' : ''}${diffPct}%)`,
+    분석: diff > 0 ? '기간1이 기간2보다 매출이 높습니다.' : diff < 0 ? '기간1이 기간2보다 매출이 낮습니다.' : '두 기간 매출이 동일합니다.',
+  });
 }
