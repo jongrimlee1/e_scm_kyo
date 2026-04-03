@@ -1,24 +1,20 @@
 import type { MiniMaxTool } from './client';
 
-// ─── Tool Definitions ───────────────────────────────────────────────────────
+// ─── Tool Definitions ──────────────────────────────────────────────────────
 
 export const AGENT_TOOLS: MiniMaxTool[] = [
+  // ── 조회 ──────────────────────────────────────────────────────────────────
   {
     type: 'function',
     function: {
       name: 'get_inventory',
-      description: '지점별 재고 현황을 조회합니다. 특정 지점명이나 제품명으로 필터링할 수 있습니다.',
+      description: '지점별 재고 현황을 조회합니다. 지점명, 제품명으로 필터링 가능. 재고 부족 여부 포함.',
       parameters: {
         type: 'object',
         properties: {
-          branch_name: {
-            type: 'string',
-            description: '지점명 (예: 강남점, 한약국, 백화점). 생략하면 전체 지점 조회.',
-          },
-          product_name: {
-            type: 'string',
-            description: '제품명 또는 키워드. 생략하면 해당 지점 모든 재고 조회.',
-          },
+          branch_name: { type: 'string', description: '지점명 (예: 강남점). 생략 시 전체 지점.' },
+          product_name: { type: 'string', description: '제품명 키워드. 생략 시 해당 지점 전체.' },
+          include_zero: { type: 'boolean', description: '재고 0인 항목도 포함 여부 (기본 false)' },
         },
       },
     },
@@ -26,58 +22,12 @@ export const AGENT_TOOLS: MiniMaxTool[] = [
   {
     type: 'function',
     function: {
-      name: 'get_customer',
-      description: '고객 정보를 조회합니다. 이름 또는 전화번호로 검색합니다. 포인트 잔액도 함께 반환됩니다.',
+      name: 'get_low_stock',
+      description: '안전재고 미달 품목 목록을 조회합니다. 재고 보충이 필요한 품목 파악에 사용.',
       parameters: {
         type: 'object',
         properties: {
-          name: {
-            type: 'string',
-            description: '고객 이름 (부분 일치)',
-          },
-          phone: {
-            type: 'string',
-            description: '전화번호 (010-0000-0000 형식)',
-          },
-        },
-      },
-    },
-  },
-  {
-    type: 'function',
-    function: {
-      name: 'get_customer_grades',
-      description: '고객 등급별 적립률 정보를 조회합니다.',
-      parameters: {
-        type: 'object',
-        properties: {},
-      },
-    },
-  },
-  {
-    type: 'function',
-    function: {
-      name: 'get_orders',
-      description: '판매 주문(매출) 내역을 조회합니다.',
-      parameters: {
-        type: 'object',
-        properties: {
-          branch_name: {
-            type: 'string',
-            description: '지점명으로 필터링',
-          },
-          date_from: {
-            type: 'string',
-            description: '조회 시작일 (YYYY-MM-DD)',
-          },
-          date_to: {
-            type: 'string',
-            description: '조회 종료일 (YYYY-MM-DD)',
-          },
-          limit: {
-            type: 'number',
-            description: '최대 조회 건수 (기본 20)',
-          },
+          branch_name: { type: 'string', description: '지점명 필터 (생략 시 전체)' },
         },
       },
     },
@@ -86,15 +36,169 @@ export const AGENT_TOOLS: MiniMaxTool[] = [
     type: 'function',
     function: {
       name: 'get_products',
-      description: '제품 목록을 조회합니다.',
+      description: '제품 목록과 단가, 원가, 바코드를 조회합니다.',
       parameters: {
         type: 'object',
         properties: {
-          name: {
-            type: 'string',
-            description: '제품명 키워드',
-          },
+          name: { type: 'string', description: '제품명 키워드' },
         },
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'get_branches',
+      description: '지점 목록(이름, 채널, 주소, 전화, 운영상태)을 조회합니다.',
+      parameters: {
+        type: 'object',
+        properties: {
+          name: { type: 'string', description: '지점명 키워드 (선택)' },
+        },
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'get_customer',
+      description: '고객을 이름 또는 전화번호로 검색합니다. 포인트 잔액, 등급, 구매이력 요약 포함.',
+      parameters: {
+        type: 'object',
+        properties: {
+          name: { type: 'string', description: '고객 이름 (부분 일치)' },
+          phone: { type: 'string', description: '전화번호' },
+        },
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'get_customer_grades',
+      description: '고객 등급별 적립률과 혜택을 조회합니다.',
+      parameters: { type: 'object', properties: {} },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'get_point_history',
+      description: '특정 고객의 포인트 적립/사용/조정 이력을 조회합니다.',
+      parameters: {
+        type: 'object',
+        properties: {
+          customer_name: { type: 'string', description: '고객 이름' },
+          phone: { type: 'string', description: '고객 전화번호' },
+          limit: { type: 'number', description: '최대 조회 건수 (기본 20)' },
+        },
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'get_orders',
+      description: '판매 주문(매출) 내역을 조회합니다. 기간, 지점, 고객으로 필터링 가능.',
+      parameters: {
+        type: 'object',
+        properties: {
+          branch_name: { type: 'string', description: '지점명 필터' },
+          customer_name: { type: 'string', description: '고객명 필터' },
+          date_from: { type: 'string', description: '시작일 (YYYY-MM-DD)' },
+          date_to: { type: 'string', description: '종료일 (YYYY-MM-DD)' },
+          limit: { type: 'number', description: '최대 조회 건수 (기본 20)' },
+        },
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'get_sales_summary',
+      description: '기간별 매출 합계, 채널별/지점별 매출 분석을 조회합니다. "이번달 매출", "오늘 매출" 등에 활용.',
+      parameters: {
+        type: 'object',
+        properties: {
+          date_from: { type: 'string', description: '시작일 (YYYY-MM-DD). 생략 시 이번달 1일.' },
+          date_to: { type: 'string', description: '종료일 (YYYY-MM-DD). 생략 시 오늘.' },
+          branch_name: { type: 'string', description: '지점명 필터 (선택)' },
+        },
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'get_suppliers',
+      description: '공급업체(매입처) 목록을 조회합니다.',
+      parameters: {
+        type: 'object',
+        properties: {
+          name: { type: 'string', description: '공급업체명 키워드 (선택)' },
+        },
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'get_purchase_orders',
+      description: '매입 발주서 목록과 상태를 조회합니다.',
+      parameters: {
+        type: 'object',
+        properties: {
+          status: {
+            type: 'string',
+            enum: ['DRAFT', 'CONFIRMED', 'PARTIALLY_RECEIVED', 'RECEIVED', 'CANCELLED'],
+            description: '상태 필터 (생략 시 전체)',
+          },
+          branch_name: { type: 'string', description: '지점명 필터 (선택)' },
+          limit: { type: 'number', description: '최대 조회 건수 (기본 20)' },
+        },
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'get_production_orders',
+      description: '생산 지시서 목록과 진행 상태를 조회합니다.',
+      parameters: {
+        type: 'object',
+        properties: {
+          status: {
+            type: 'string',
+            enum: ['PENDING', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED'],
+            description: '상태 필터 (생략 시 전체)',
+          },
+          branch_name: { type: 'string', description: '지점명 필터 (선택)' },
+          limit: { type: 'number', description: '최대 조회 건수 (기본 20)' },
+        },
+      },
+    },
+  },
+
+  // ── 재고 관련 쓰기 ──────────────────────────────────────────────────────────
+  {
+    type: 'function',
+    function: {
+      name: 'adjust_inventory',
+      description: '특정 지점의 재고를 입고(+), 출고(-), 실사(=) 방식으로 조정합니다.',
+      parameters: {
+        type: 'object',
+        properties: {
+          branch_name: { type: 'string', description: '지점명' },
+          product_name: { type: 'string', description: '제품명' },
+          movement_type: {
+            type: 'string',
+            enum: ['IN', 'OUT', 'ADJUST'],
+            description: 'IN=입고(현재+수량), OUT=출고(현재-수량), ADJUST=실사(현재=수량)',
+          },
+          quantity: { type: 'number', description: '수량' },
+          memo: { type: 'string', description: '사유 (선택)' },
+        },
+        required: ['branch_name', 'product_name', 'movement_type', 'quantity'],
       },
     },
   },
@@ -102,57 +206,56 @@ export const AGENT_TOOLS: MiniMaxTool[] = [
     type: 'function',
     function: {
       name: 'transfer_inventory',
-      description: '지점 간 재고를 이동합니다. 반드시 사용자 확인 후 실행됩니다.',
+      description: '지점 간 재고를 이동합니다. 출발 지점 재고가 차감되고 도착 지점에 추가됩니다.',
       parameters: {
         type: 'object',
         properties: {
-          from_branch_name: {
-            type: 'string',
-            description: '출발 지점명',
-          },
-          to_branch_name: {
-            type: 'string',
-            description: '도착 지점명',
-          },
-          product_name: {
-            type: 'string',
-            description: '이동할 제품명',
-          },
-          quantity: {
-            type: 'number',
-            description: '이동할 수량',
-          },
+          from_branch_name: { type: 'string', description: '출발 지점명' },
+          to_branch_name: { type: 'string', description: '도착 지점명' },
+          product_name: { type: 'string', description: '제품명' },
+          quantity: { type: 'number', description: '이동 수량' },
         },
         required: ['from_branch_name', 'to_branch_name', 'product_name', 'quantity'],
+      },
+    },
+  },
+
+  // ── 고객 관련 쓰기 ──────────────────────────────────────────────────────────
+  {
+    type: 'function',
+    function: {
+      name: 'create_customer',
+      description: '새 고객을 등록합니다.',
+      parameters: {
+        type: 'object',
+        properties: {
+          name: { type: 'string', description: '고객 이름' },
+          phone: { type: 'string', description: '전화번호 (010-XXXX-XXXX)' },
+          grade: { type: 'string', enum: ['NORMAL', 'VIP', 'VVIP'], description: '등급 (기본 NORMAL)' },
+          email: { type: 'string', description: '이메일 (선택)' },
+          address: { type: 'string', description: '주소 (선택)' },
+          health_note: { type: 'string', description: '건강 메모 (선택)' },
+        },
+        required: ['name', 'phone'],
       },
     },
   },
   {
     type: 'function',
     function: {
-      name: 'adjust_points',
-      description: '고객 포인트를 수동으로 조정합니다. 반드시 사용자 확인 후 실행됩니다.',
+      name: 'update_customer',
+      description: '고객 정보(전화번호, 이메일, 주소, 건강메모, 등급)를 수정합니다.',
       parameters: {
         type: 'object',
         properties: {
-          customer_name: {
-            type: 'string',
-            description: '고객 이름',
-          },
-          phone: {
-            type: 'string',
-            description: '고객 전화번호',
-          },
-          points: {
-            type: 'number',
-            description: '조정할 포인트 (양수=적립, 음수=차감)',
-          },
-          reason: {
-            type: 'string',
-            description: '조정 사유',
-          },
+          customer_name: { type: 'string', description: '찾을 고객 이름' },
+          phone: { type: 'string', description: '찾을 고객 전화번호' },
+          new_phone: { type: 'string', description: '새 전화번호' },
+          email: { type: 'string', description: '새 이메일' },
+          address: { type: 'string', description: '새 주소' },
+          health_note: { type: 'string', description: '건강 메모 업데이트' },
+          grade: { type: 'string', enum: ['NORMAL', 'VIP', 'VVIP'], description: '변경할 등급' },
         },
-        required: ['points', 'reason'],
       },
     },
   },
@@ -160,17 +263,13 @@ export const AGENT_TOOLS: MiniMaxTool[] = [
     type: 'function',
     function: {
       name: 'update_customer_grade',
-      description: '고객 등급을 변경합니다. 반드시 사용자 확인 후 실행됩니다.',
+      description: '특정 고객의 등급을 변경합니다.',
       parameters: {
         type: 'object',
         properties: {
           customer_name: { type: 'string', description: '고객 이름' },
           phone: { type: 'string', description: '고객 전화번호' },
-          new_grade: {
-            type: 'string',
-            enum: ['NORMAL', 'VIP', 'VVIP'],
-            description: '변경할 등급',
-          },
+          new_grade: { type: 'string', enum: ['NORMAL', 'VIP', 'VVIP'], description: '변경할 등급' },
         },
         required: ['new_grade'],
       },
@@ -179,17 +278,40 @@ export const AGENT_TOOLS: MiniMaxTool[] = [
   {
     type: 'function',
     function: {
-      name: 'create_branch',
-      description: '새 지점을 추가합니다. 코드 > 지점관리에서 할 수 있는 지점 추가 작업입니다. 사용자 확인 후 실행됩니다.',
+      name: 'upgrade_customer_grades',
+      description: '누적 구매액 기준으로 전체 고객 등급을 자동 업그레이드합니다. (100만원↑→VIP, 300만원↑→VVIP)',
+      parameters: { type: 'object', properties: {} },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'adjust_points',
+      description: '고객 포인트를 수동으로 추가하거나 차감합니다.',
       parameters: {
         type: 'object',
         properties: {
-          name: { type: 'string', description: '지점명 (예: 송파점, 강남백화점)' },
-          channel: {
-            type: 'string',
-            enum: ['STORE', 'DEPT_STORE', 'ONLINE', 'EVENT'],
-            description: '채널 유형: STORE=한약국매장, DEPT_STORE=백화점, ONLINE=자사몰, EVENT=이벤트',
-          },
+          customer_name: { type: 'string', description: '고객 이름' },
+          phone: { type: 'string', description: '고객 전화번호' },
+          points: { type: 'number', description: '조정 포인트 (양수=적립, 음수=차감)' },
+          reason: { type: 'string', description: '조정 사유' },
+        },
+        required: ['points', 'reason'],
+      },
+    },
+  },
+
+  // ── 지점/제품 관련 쓰기 ─────────────────────────────────────────────────────
+  {
+    type: 'function',
+    function: {
+      name: 'create_branch',
+      description: '새 지점/매장을 추가합니다. 추가 시 모든 제품에 대해 재고 레코드(0개)가 자동 생성됩니다.',
+      parameters: {
+        type: 'object',
+        properties: {
+          name: { type: 'string', description: '지점명 (예: 송파점)' },
+          channel: { type: 'string', enum: ['STORE', 'DEPT_STORE', 'ONLINE', 'EVENT'], description: '채널 유형' },
           address: { type: 'string', description: '주소 (선택)' },
           phone: { type: 'string', description: '전화번호 (선택)' },
         },
@@ -201,7 +323,7 @@ export const AGENT_TOOLS: MiniMaxTool[] = [
     type: 'function',
     function: {
       name: 'update_branch',
-      description: '지점 정보를 수정합니다. 사용자 확인 후 실행됩니다.',
+      description: '지점 정보(이름, 주소, 전화, 활성화여부)를 수정합니다.',
       parameters: {
         type: 'object',
         properties: {
@@ -218,531 +340,666 @@ export const AGENT_TOOLS: MiniMaxTool[] = [
   {
     type: 'function',
     function: {
-      name: 'create_customer',
-      description: '새 고객을 등록합니다. 고객 메뉴에서 할 수 있는 고객 추가 작업입니다. 사용자 확인 후 실행됩니다.',
+      name: 'create_product',
+      description: '새 제품을 등록합니다. 등록 시 모든 지점에 재고 레코드(0개)가 자동 생성됩니다.',
       parameters: {
         type: 'object',
         properties: {
-          name: { type: 'string', description: '고객 이름' },
-          phone: { type: 'string', description: '전화번호 (010-0000-0000)' },
-          grade: {
-            type: 'string',
-            enum: ['NORMAL', 'VIP', 'VVIP'],
-            description: '등급 (기본: NORMAL)',
-          },
-          email: { type: 'string', description: '이메일 (선택)' },
-          address: { type: 'string', description: '주소 (선택)' },
-          health_note: { type: 'string', description: '건강 메모 (선택)' },
+          name: { type: 'string', description: '제품명' },
+          price: { type: 'number', description: '판매가 (원)' },
+          cost: { type: 'number', description: '원가 (원, 선택)' },
+          unit: { type: 'string', description: '단위 (기본 "개")' },
+          barcode: { type: 'string', description: '바코드 (선택)' },
         },
-        required: ['name', 'phone'],
+        required: ['name', 'price'],
+      },
+    },
+  },
+
+  // ── 매입(발주) 관련 쓰기 ───────────────────────────────────────────────────
+  {
+    type: 'function',
+    function: {
+      name: 'create_purchase_order',
+      description: '공급업체에 제품 발주서를 작성합니다. DRAFT 상태로 생성되며 확정 전 수정 가능.',
+      parameters: {
+        type: 'object',
+        properties: {
+          supplier_name: { type: 'string', description: '공급업체명' },
+          branch_name: { type: 'string', description: '입고 지점명' },
+          product_name: { type: 'string', description: '발주할 제품명' },
+          quantity: { type: 'number', description: '발주 수량' },
+          unit_price: { type: 'number', description: '매입 단가 (원)' },
+          memo: { type: 'string', description: '발주 메모 (선택)' },
+        },
+        required: ['supplier_name', 'branch_name', 'product_name', 'quantity', 'unit_price'],
       },
     },
   },
   {
     type: 'function',
     function: {
-      name: 'update_customer',
-      description: '고객 정보를 수정합니다. 사용자 확인 후 실행됩니다.',
+      name: 'confirm_purchase_order',
+      description: '발주서를 DRAFT에서 CONFIRMED(확정) 상태로 변경합니다. 확정 후 수정 불가.',
       parameters: {
         type: 'object',
         properties: {
-          customer_name: { type: 'string', description: '찾을 고객 이름' },
-          phone: { type: 'string', description: '찾을 고객 전화번호' },
-          new_phone: { type: 'string', description: '새 전화번호' },
-          email: { type: 'string', description: '새 이메일' },
-          address: { type: 'string', description: '새 주소' },
-          health_note: { type: 'string', description: '건강 메모' },
-          grade: {
-            type: 'string',
-            enum: ['NORMAL', 'VIP', 'VVIP'],
-            description: '변경할 등급',
-          },
+          order_number: { type: 'string', description: '발주서 번호 (PO-...)' },
         },
+        required: ['order_number'],
       },
     },
   },
   {
     type: 'function',
     function: {
-      name: 'get_branches',
-      description: '지점 목록을 조회합니다.',
+      name: 'receive_purchase_order',
+      description: '발주서에 대한 실제 입고를 처리합니다. 재고가 자동으로 증가하고 회계 분개가 생성됩니다.',
       parameters: {
         type: 'object',
         properties: {
-          name: { type: 'string', description: '지점명 키워드 (선택)' },
+          order_number: { type: 'string', description: '발주서 번호 (PO-...)' },
+          memo: { type: 'string', description: '입고 메모 (선택)' },
         },
+        required: ['order_number'],
+      },
+    },
+  },
+
+  // ── 생산 관련 쓰기 ──────────────────────────────────────────────────────────
+  {
+    type: 'function',
+    function: {
+      name: 'create_production_order',
+      description: '제품 생산 지시서를 생성합니다. BOM이 등록된 제품만 가능. PENDING 상태로 생성.',
+      parameters: {
+        type: 'object',
+        properties: {
+          product_name: { type: 'string', description: '생산할 완제품명' },
+          branch_name: { type: 'string', description: '생산 지점명' },
+          quantity: { type: 'number', description: '생산 수량' },
+          memo: { type: 'string', description: '생산 메모 (선택)' },
+        },
+        required: ['product_name', 'branch_name', 'quantity'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'start_production_order',
+      description: '생산 지시서를 착수(PENDING→IN_PROGRESS) 상태로 변경합니다.',
+      parameters: {
+        type: 'object',
+        properties: {
+          order_number: { type: 'string', description: '생산 지시서 번호 (WO-...)' },
+        },
+        required: ['order_number'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'complete_production_order',
+      description: '생산을 완료 처리합니다. BOM 원재료가 재고에서 차감되고 완제품 재고가 증가합니다.',
+      parameters: {
+        type: 'object',
+        properties: {
+          order_number: { type: 'string', description: '생산 지시서 번호 (WO-...)' },
+        },
+        required: ['order_number'],
+      },
+    },
+  },
+
+  // ── 알림 ────────────────────────────────────────────────────────────────────
+  {
+    type: 'function',
+    function: {
+      name: 'send_sms',
+      description: 'SMS를 발송합니다. 고객 이름/전화번호로 특정 고객에게, 또는 전화번호를 직접 지정하여 발송.',
+      parameters: {
+        type: 'object',
+        properties: {
+          customer_name: { type: 'string', description: '발송할 고객 이름 (phone 대신 사용 가능)' },
+          phone: { type: 'string', description: '수신자 전화번호 (직접 지정)' },
+          message: { type: 'string', description: '발송할 SMS 내용' },
+        },
+        required: ['message'],
       },
     },
   },
 ];
 
 export const WRITE_TOOLS = new Set([
+  'adjust_inventory',
   'transfer_inventory',
-  'adjust_points',
-  'update_customer_grade',
-  'create_branch',
-  'update_branch',
   'create_customer',
   'update_customer',
+  'update_customer_grade',
+  'upgrade_customer_grades',
+  'adjust_points',
+  'create_branch',
+  'update_branch',
+  'create_product',
+  'create_purchase_order',
+  'confirm_purchase_order',
+  'receive_purchase_order',
+  'create_production_order',
+  'start_production_order',
+  'complete_production_order',
+  'send_sms',
 ]);
+
+// ─── Shared Helpers ──────────────────────────────────────────────────────────
+
+async function findBranch(sb: any, name: string) {
+  const { data } = await sb.from('branches').select('id, name').ilike('name', `%${name}%`).limit(1).single();
+  return data as { id: string; name: string } | null;
+}
+
+async function findProduct(sb: any, name: string) {
+  const { data } = await sb.from('products').select('id, name, code, price, cost, unit').eq('is_active', true).ilike('name', `%${name}%`).limit(1).single();
+  return data as { id: string; name: string; code: string; price: number; cost: number; unit: string } | null;
+}
+
+async function findCustomer(sb: any, args: { customer_name?: string; phone?: string; name?: string }) {
+  const name = args.customer_name || args.name;
+  let q = sb.from('customers').select('id, name, phone, grade, email').eq('is_active', true);
+  if (args.phone) q = q.eq('phone', args.phone);
+  else if (name) q = q.ilike('name', `%${name}%`);
+  const { data } = await q.limit(1).single();
+  return data as { id: string; name: string; phone: string; grade: string; email: string } | null;
+}
+
+async function getPoints(sb: any, customerId: string): Promise<number> {
+  const { data } = await sb.from('point_history').select('balance').eq('customer_id', customerId).order('created_at', { ascending: false }).limit(1).single();
+  return data?.balance ?? 0;
+}
 
 // ─── Tool Executors ──────────────────────────────────────────────────────────
 
-export async function executeTool(
-  toolName: string,
-  args: Record<string, any>,
-  supabase: any
-): Promise<string> {
+export async function executeTool(toolName: string, args: Record<string, any>, sb: any): Promise<string> {
   try {
     switch (toolName) {
-      case 'get_inventory':
-        return await execGetInventory(supabase, args);
-      case 'get_customer':
-        return await execGetCustomer(supabase, args);
-      case 'get_customer_grades':
-        return await execGetCustomerGrades(supabase);
-      case 'get_orders':
-        return await execGetOrders(supabase, args);
-      case 'get_products':
-        return await execGetProducts(supabase, args);
-      case 'transfer_inventory':
-        return await execTransferInventory(supabase, args as any);
-      case 'adjust_points':
-        return await execAdjustPoints(supabase, args as any);
-      case 'update_customer_grade':
-        return await execUpdateCustomerGrade(supabase, args as any);
-      case 'create_branch':
-        return await execCreateBranch(supabase, args as any);
-      case 'update_branch':
-        return await execUpdateBranch(supabase, args as any);
-      case 'create_customer':
-        return await execCreateCustomer(supabase, args as any);
-      case 'update_customer':
-        return await execUpdateCustomer(supabase, args as any);
-      case 'get_branches':
-        return await execGetBranches(supabase, args);
-      default:
-        return JSON.stringify({ error: `Unknown tool: ${toolName}` });
+      case 'get_inventory':            return execGetInventory(sb, args);
+      case 'get_low_stock':            return execGetLowStock(sb, args);
+      case 'get_products':             return execGetProducts(sb, args);
+      case 'get_branches':             return execGetBranches(sb, args);
+      case 'get_customer':             return execGetCustomer(sb, args);
+      case 'get_customer_grades':      return execGetCustomerGrades(sb);
+      case 'get_point_history':        return execGetPointHistory(sb, args);
+      case 'get_orders':               return execGetOrders(sb, args);
+      case 'get_sales_summary':        return execGetSalesSummary(sb, args);
+      case 'get_suppliers':            return execGetSuppliers(sb, args);
+      case 'get_purchase_orders':      return execGetPurchaseOrders(sb, args);
+      case 'get_production_orders':    return execGetProductionOrders(sb, args);
+      case 'adjust_inventory':         return execAdjustInventory(sb, args as any);
+      case 'transfer_inventory':       return execTransferInventory(sb, args as any);
+      case 'create_customer':          return execCreateCustomer(sb, args as any);
+      case 'update_customer':          return execUpdateCustomer(sb, args as any);
+      case 'update_customer_grade':    return execUpdateCustomerGrade(sb, args as any);
+      case 'upgrade_customer_grades':  return execUpgradeCustomerGrades(sb);
+      case 'adjust_points':            return execAdjustPoints(sb, args as any);
+      case 'create_branch':            return execCreateBranch(sb, args as any);
+      case 'update_branch':            return execUpdateBranch(sb, args as any);
+      case 'create_product':           return execCreateProduct(sb, args as any);
+      case 'create_purchase_order':    return execCreatePurchaseOrder(sb, args as any);
+      case 'confirm_purchase_order':   return execConfirmPurchaseOrder(sb, args as any);
+      case 'receive_purchase_order':   return execReceivePurchaseOrder(sb, args as any);
+      case 'create_production_order':  return execCreateProductionOrder(sb, args as any);
+      case 'start_production_order':   return execStartProductionOrder(sb, args as any);
+      case 'complete_production_order':return execCompleteProductionOrder(sb, args as any);
+      case 'send_sms':                 return execSendSms(sb, args as any);
+      default: return JSON.stringify({ error: `알 수 없는 도구: ${toolName}` });
     }
   } catch (e: any) {
     return JSON.stringify({ error: e.message });
   }
 }
 
-async function findBranchId(supabase: any, name: string): Promise<{ id: string; name: string } | null> {
-  const { data } = await supabase
-    .from('branches')
-    .select('id, name')
-    .ilike('name', `%${name}%`)
-    .eq('is_active', true)
-    .limit(1)
-    .single();
-  return data || null;
-}
+// ── 재고 조회 ────────────────────────────────────────────────────────────────
 
-async function findProductId(supabase: any, name: string): Promise<{ id: string; name: string } | null> {
-  const { data } = await supabase
-    .from('products')
-    .select('id, name')
-    .ilike('name', `%${name}%`)
-    .eq('is_active', true)
-    .limit(1)
-    .single();
-  return data || null;
-}
-
-async function findCustomer(supabase: any, args: { customer_name?: string; phone?: string; name?: string }) {
-  const name = args.customer_name || args.name;
-  let q = supabase.from('customers').select('id, name, phone, grade, email').eq('is_active', true);
-  if (args.phone) q = q.eq('phone', args.phone);
-  else if (name) q = q.ilike('name', `%${name}%`);
-  q = q.limit(1).single();
-  const { data } = await q;
-  return data || null;
-}
-
-async function getCustomerPoints(supabase: any, customerId: string): Promise<number> {
-  const { data } = await supabase
-    .from('point_history')
-    .select('balance')
-    .eq('customer_id', customerId)
-    .order('created_at', { ascending: false })
-    .limit(1)
-    .single();
-  return data?.balance ?? 0;
-}
-
-async function execGetInventory(supabase: any, args: { branch_name?: string; product_name?: string }): Promise<string> {
+async function execGetInventory(sb: any, args: { branch_name?: string; product_name?: string; include_zero?: boolean }): Promise<string> {
   let branchId: string | null = null;
   let productId: string | null = null;
 
   if (args.branch_name) {
-    const branch = await findBranchId(supabase, args.branch_name);
-    if (!branch) return JSON.stringify({ error: `지점 "${args.branch_name}"을(를) 찾을 수 없습니다.` });
-    branchId = branch.id;
+    const b = await findBranch(sb, args.branch_name);
+    if (!b) return JSON.stringify({ error: `지점 "${args.branch_name}" 없음` });
+    branchId = b.id;
   }
-
   if (args.product_name) {
-    const product = await findProductId(supabase, args.product_name);
-    if (!product) return JSON.stringify({ error: `제품 "${args.product_name}"을(를) 찾을 수 없습니다.` });
-    productId = product.id;
+    const p = await findProduct(sb, args.product_name);
+    if (!p) return JSON.stringify({ error: `제품 "${args.product_name}" 없음` });
+    productId = p.id;
   }
 
-  let q = supabase
-    .from('inventories')
-    .select('quantity, safety_stock, products(name, code), branches(name)');
-
+  let q = sb.from('inventories').select('quantity, safety_stock, products(name, code), branches(name)');
   if (branchId) q = q.eq('branch_id', branchId);
   if (productId) q = q.eq('product_id', productId);
-  q = q.gt('quantity', 0).limit(30);
+  if (!args.include_zero) q = q.gt('quantity', 0);
+  q = q.limit(50);
 
   const { data, error } = await q;
   if (error) return JSON.stringify({ error: error.message });
+  if (!data?.length) return JSON.stringify({ 결과: '재고 데이터 없음' });
 
-  const result = (data || []).map((inv: any) => ({
+  return JSON.stringify((data as any[]).map(inv => ({
     지점: inv.branches?.name,
     제품: inv.products?.name,
+    코드: inv.products?.code,
     수량: inv.quantity,
     안전재고: inv.safety_stock,
-    상태: inv.quantity <= (inv.safety_stock || 0) ? '⚠️ 부족' : '정상',
-  }));
-
-  if (result.length === 0) return JSON.stringify({ 결과: '재고 없음' });
-  return JSON.stringify(result);
+    상태: inv.quantity < (inv.safety_stock || 0) ? '⚠️부족' : '정상',
+  })));
 }
 
-async function execGetCustomer(supabase: any, args: { name?: string; phone?: string }): Promise<string> {
-  let q = supabase.from('customers').select('*').eq('is_active', true);
+async function execGetLowStock(sb: any, args: { branch_name?: string }): Promise<string> {
+  let branchId: string | null = null;
+  if (args.branch_name) {
+    const b = await findBranch(sb, args.branch_name);
+    if (!b) return JSON.stringify({ error: `지점 "${args.branch_name}" 없음` });
+    branchId = b.id;
+  }
+
+  let q = sb.from('inventories').select('quantity, safety_stock, products(name, code), branches(name)');
+  if (branchId) q = q.eq('branch_id', branchId);
+  const { data } = await q;
+
+  const low = ((data || []) as any[]).filter(i => i.quantity < (i.safety_stock || 0));
+  if (!low.length) return JSON.stringify({ 결과: '재고 부족 품목 없음 ✅' });
+
+  return JSON.stringify({
+    부족건수: low.length,
+    목록: low.map(i => ({
+      지점: i.branches?.name,
+      제품: i.products?.name,
+      현재: i.quantity,
+      안전재고: i.safety_stock,
+      부족량: i.safety_stock - i.quantity,
+    })),
+  });
+}
+
+// ── 제품/지점 조회 ───────────────────────────────────────────────────────────
+
+async function execGetProducts(sb: any, args: { name?: string }): Promise<string> {
+  let q = sb.from('products').select('name, code, price, cost, unit, barcode').eq('is_active', true).order('name');
+  if (args.name) q = q.ilike('name', `%${args.name}%`);
+  const { data, error } = await q.limit(30);
+  if (error) return JSON.stringify({ error: error.message });
+  return JSON.stringify((data || []) as any[]);
+}
+
+async function execGetBranches(sb: any, args: { name?: string }): Promise<string> {
+  const channelMap: Record<string, string> = { STORE: '한약국', DEPT_STORE: '백화점', ONLINE: '자사몰', EVENT: '이벤트' };
+  let q = sb.from('branches').select('name, code, channel, address, phone, is_active').order('name');
+  if (args.name) q = q.ilike('name', `%${args.name}%`);
+  const { data, error } = await q.limit(30);
+  if (error) return JSON.stringify({ error: error.message });
+  return JSON.stringify(((data || []) as any[]).map(b => ({
+    지점명: b.name, 코드: b.code,
+    채널: channelMap[b.channel] || b.channel,
+    주소: b.address || '-', 전화: b.phone || '-',
+    상태: b.is_active ? '운영중' : '비활성',
+  })));
+}
+
+// ── 고객 조회 ────────────────────────────────────────────────────────────────
+
+async function execGetCustomer(sb: any, args: { name?: string; phone?: string }): Promise<string> {
+  let q = sb.from('customers').select('id, name, phone, email, grade, address, health_note, is_active, created_at').eq('is_active', true);
   if (args.phone) q = q.eq('phone', args.phone);
   else if (args.name) q = q.ilike('name', `%${args.name}%`);
   q = q.limit(5);
 
   const { data, error } = await q;
   if (error) return JSON.stringify({ error: error.message });
-  if (!data || data.length === 0) return JSON.stringify({ 결과: '고객을 찾을 수 없습니다.' });
+  if (!data?.length) return JSON.stringify({ 결과: '고객 없음' });
 
-  const results = await Promise.all(
-    data.map(async (c: any) => {
-      const points = await getCustomerPoints(supabase, c.id);
-      return {
-        이름: c.name,
-        전화번호: c.phone,
-        이메일: c.email || '-',
-        등급: c.grade,
-        포인트잔액: points,
-        활성: c.is_active,
-        등록일: c.created_at?.slice(0, 10),
-      };
-    })
-  );
+  const gradeLabels: Record<string, string> = { NORMAL: '일반', VIP: 'VIP', VVIP: 'VVIP' };
+  const results = await Promise.all((data as any[]).map(async c => {
+    const points = await getPoints(sb, c.id);
+    // 최근 주문 합산
+    const { data: orders } = await sb.from('sales_orders')
+      .select('total_amount').eq('customer_id', c.id).eq('status', 'COMPLETED');
+    const totalPurchase = ((orders || []) as any[]).reduce((s: number, o: any) => s + (o.total_amount || 0), 0);
+    return {
+      이름: c.name, 전화: c.phone, 이메일: c.email || '-',
+      등급: gradeLabels[c.grade] || c.grade,
+      포인트잔액: `${points.toLocaleString()}P`,
+      누적구매액: `${totalPurchase.toLocaleString()}원`,
+      주소: c.address || '-',
+      건강메모: c.health_note || '-',
+      등록일: c.created_at?.slice(0, 10),
+    };
+  }));
 
   return JSON.stringify(results);
 }
 
-async function execGetCustomerGrades(supabase: any): Promise<string> {
-  const { data, error } = await supabase
-    .from('customer_grades')
-    .select('code, name, point_rate')
-    .eq('is_active', true)
-    .order('sort_order');
-
+async function execGetCustomerGrades(sb: any): Promise<string> {
+  const { data, error } = await sb.from('customer_grades').select('code, name, point_rate').eq('is_active', true).order('sort_order');
   if (error) return JSON.stringify({ error: error.message });
-  return JSON.stringify(data || []);
+  return JSON.stringify(((data || []) as any[]).map(g => ({
+    코드: g.code, 등급명: g.name, 적립률: `${g.point_rate}%`,
+  })));
 }
 
-async function execGetOrders(supabase: any, args: { branch_name?: string; date_from?: string; date_to?: string; limit?: number }): Promise<string> {
+async function execGetPointHistory(sb: any, args: { customer_name?: string; phone?: string; limit?: number }): Promise<string> {
+  const customer = await findCustomer(sb, args);
+  if (!customer) return JSON.stringify({ error: '고객을 찾을 수 없습니다.' });
+
+  const typeLabels: Record<string, string> = { earn: '적립', use: '사용', adjust: '조정', expire: '만료' };
+  const { data, error } = await sb.from('point_history')
+    .select('type, points, balance, description, created_at')
+    .eq('customer_id', customer.id)
+    .order('created_at', { ascending: false })
+    .limit(args.limit || 20);
+
+  if (error) return JSON.stringify({ error: error.message });
+  return JSON.stringify({
+    고객: customer.name,
+    현재잔액: `${(await getPoints(sb, customer.id)).toLocaleString()}P`,
+    이력: ((data || []) as any[]).map(h => ({
+      구분: typeLabels[h.type] || h.type,
+      포인트: `${h.points > 0 ? '+' : ''}${h.points}P`,
+      잔액: `${h.balance}P`,
+      설명: h.description,
+      일시: h.created_at?.slice(0, 16),
+    })),
+  });
+}
+
+// ── 판매 조회 ────────────────────────────────────────────────────────────────
+
+async function execGetOrders(sb: any, args: { branch_name?: string; customer_name?: string; date_from?: string; date_to?: string; limit?: number }): Promise<string> {
   let branchId: string | null = null;
   if (args.branch_name) {
-    const branch = await findBranchId(supabase, args.branch_name);
-    if (!branch) return JSON.stringify({ error: `지점 "${args.branch_name}"을(를) 찾을 수 없습니다.` });
-    branchId = branch.id;
+    const b = await findBranch(sb, args.branch_name);
+    if (!b) return JSON.stringify({ error: `지점 "${args.branch_name}" 없음` });
+    branchId = b.id;
   }
 
-  let q = supabase
-    .from('sales_orders')
-    .select('order_number, total_amount, payment_method, status, ordered_at, channel, customers(name)')
+  const paymentLabels: Record<string, string> = { cash: '현금', card: '카드', kakao: '카카오페이' };
+  const statusLabels: Record<string, string> = { COMPLETED: '완료', CANCELLED: '취소', REFUNDED: '환불', PARTIALLY_REFUNDED: '부분환불' };
+
+  let q = sb.from('sales_orders')
+    .select('order_number, total_amount, discount_amount, points_used, payment_method, status, ordered_at, channel, customers(name)')
     .order('ordered_at', { ascending: false });
 
   if (branchId) q = q.eq('branch_id', branchId);
-  if (args.date_from) q = q.gte('ordered_at', args.date_from);
-  if (args.date_to) q = q.lte('ordered_at', args.date_to + 'T23:59:59');
+  if (args.date_from) q = q.gte('ordered_at', `${args.date_from}T00:00:00`);
+  if (args.date_to) q = q.lte('ordered_at', `${args.date_to}T23:59:59`);
+  q = q.limit(args.limit || 20);
+
+  // customer name filter
+  if (args.customer_name) {
+    const cust = await findCustomer(sb, { name: args.customer_name });
+    if (!cust) return JSON.stringify({ 결과: '해당 고객 주문 없음' });
+    q = q.eq('customer_id', cust.id);
+  }
+
+  const { data, error } = await q;
+  if (error) return JSON.stringify({ error: error.message });
+  if (!data?.length) return JSON.stringify({ 결과: '주문 없음' });
+
+  const list = data as any[];
+  const total = list.reduce((s, o) => s + (o.total_amount || 0), 0);
+  return JSON.stringify({
+    조회건수: list.length, 합계금액: `${total.toLocaleString()}원`,
+    목록: list.map(o => ({
+      주문번호: o.order_number, 고객: o.customers?.name || '비회원',
+      금액: `${(o.total_amount || 0).toLocaleString()}원`,
+      할인: o.discount_amount ? `${o.discount_amount.toLocaleString()}원` : '-',
+      결제: paymentLabels[o.payment_method] || o.payment_method,
+      상태: statusLabels[o.status] || o.status,
+      일시: o.ordered_at?.slice(0, 16),
+    })),
+  });
+}
+
+async function execGetSalesSummary(sb: any, args: { date_from?: string; date_to?: string; branch_name?: string }): Promise<string> {
+  const now = new Date();
+  const from = args.date_from || `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
+  const to = args.date_to || now.toISOString().slice(0, 10);
+
+  let branchId: string | null = null;
+  if (args.branch_name) {
+    const b = await findBranch(sb, args.branch_name);
+    if (!b) return JSON.stringify({ error: `지점 "${args.branch_name}" 없음` });
+    branchId = b.id;
+  }
+
+  let q = sb.from('sales_orders')
+    .select('total_amount, discount_amount, channel, branch_id, branches(name)')
+    .eq('status', 'COMPLETED')
+    .gte('ordered_at', `${from}T00:00:00`)
+    .lte('ordered_at', `${to}T23:59:59`);
+  if (branchId) q = q.eq('branch_id', branchId);
+
+  const { data, error } = await q;
+  if (error) return JSON.stringify({ error: error.message });
+
+  const orders = (data || []) as any[];
+  const totalRevenue = orders.reduce((s, o) => s + (o.total_amount || 0), 0);
+  const totalDiscount = orders.reduce((s, o) => s + (o.discount_amount || 0), 0);
+
+  // 채널별
+  const channelLabels: Record<string, string> = { STORE: '한약국', DEPT_STORE: '백화점', ONLINE: '자사몰', EVENT: '이벤트' };
+  const byChannel: Record<string, { amount: number; count: number }> = {};
+  const byBranch: Record<string, { name: string; amount: number; count: number }> = {};
+  for (const o of orders) {
+    const ch = o.channel || 'STORE';
+    if (!byChannel[ch]) byChannel[ch] = { amount: 0, count: 0 };
+    byChannel[ch].amount += o.total_amount || 0;
+    byChannel[ch].count++;
+
+    const bn = o.branches?.name || o.branch_id;
+    if (!byBranch[bn]) byBranch[bn] = { name: bn, amount: 0, count: 0 };
+    byBranch[bn].amount += o.total_amount || 0;
+    byBranch[bn].count++;
+  }
+
+  return JSON.stringify({
+    기간: `${from} ~ ${to}`,
+    총매출: `${totalRevenue.toLocaleString()}원`,
+    총할인: `${totalDiscount.toLocaleString()}원`,
+    순매출: `${(totalRevenue - totalDiscount).toLocaleString()}원`,
+    주문건수: orders.length,
+    채널별: Object.entries(byChannel).map(([k, v]) => ({
+      채널: channelLabels[k] || k, 매출: `${v.amount.toLocaleString()}원`, 건수: v.count,
+    })),
+    지점별: Object.values(byBranch).sort((a, b) => b.amount - a.amount).map(v => ({
+      지점: v.name, 매출: `${v.amount.toLocaleString()}원`, 건수: v.count,
+    })),
+  });
+}
+
+// ── 매입 조회 ────────────────────────────────────────────────────────────────
+
+async function execGetSuppliers(sb: any, args: { name?: string }): Promise<string> {
+  let q = sb.from('suppliers').select('name, code, contact_name, phone, email, is_active').eq('is_active', true).order('name');
+  if (args.name) q = q.ilike('name', `%${args.name}%`);
+  const { data, error } = await q.limit(30);
+  if (error) return JSON.stringify({ error: error.message });
+  if (!data?.length) return JSON.stringify({ 결과: '공급업체 없음' });
+  return JSON.stringify(((data || []) as any[]).map(s => ({
+    업체명: s.name, 코드: s.code,
+    담당자: s.contact_name || '-', 전화: s.phone || '-', 이메일: s.email || '-',
+  })));
+}
+
+async function execGetPurchaseOrders(sb: any, args: { status?: string; branch_name?: string; limit?: number }): Promise<string> {
+  const statusLabels: Record<string, string> = {
+    DRAFT: '초안', CONFIRMED: '확정', PARTIALLY_RECEIVED: '부분입고', RECEIVED: '입고완료', CANCELLED: '취소',
+  };
+
+  let branchId: string | null = null;
+  if (args.branch_name) {
+    const b = await findBranch(sb, args.branch_name);
+    if (!b) return JSON.stringify({ error: `지점 "${args.branch_name}" 없음` });
+    branchId = b.id;
+  }
+
+  let q = sb.from('purchase_orders')
+    .select('order_number, status, total_amount, ordered_at, memo, suppliers(name), branches(name)')
+    .order('ordered_at', { ascending: false });
+  if (args.status) q = q.eq('status', args.status);
+  if (branchId) q = q.eq('branch_id', branchId);
   q = q.limit(args.limit || 20);
 
   const { data, error } = await q;
   if (error) return JSON.stringify({ error: error.message });
-  if (!data || data.length === 0) return JSON.stringify({ 결과: '주문 내역 없음' });
+  if (!data?.length) return JSON.stringify({ 결과: '발주서 없음' });
 
-  const total = data.reduce((sum: number, o: any) => sum + (o.total_amount || 0), 0);
-  const result = {
-    조회건수: data.length,
-    총매출: total,
-    주문목록: data.map((o: any) => ({
-      주문번호: o.order_number,
-      고객: o.customers?.name || '비회원',
-      금액: o.total_amount,
-      결제: o.payment_method,
-      상태: o.status,
-      일시: o.ordered_at?.slice(0, 16),
-    })),
-  };
-
-  return JSON.stringify(result);
+  return JSON.stringify(((data || []) as any[]).map(o => ({
+    발주번호: o.order_number,
+    공급업체: o.suppliers?.name || '-',
+    지점: o.branches?.name || '-',
+    금액: `${(o.total_amount || 0).toLocaleString()}원`,
+    상태: statusLabels[o.status] || o.status,
+    일자: o.ordered_at?.slice(0, 10),
+    메모: o.memo || '-',
+  })));
 }
 
-async function execGetProducts(supabase: any, args: { name?: string }): Promise<string> {
-  let q = supabase
-    .from('products')
-    .select('name, code, price, unit')
-    .eq('is_active', true)
-    .order('name');
+// ── 생산 조회 ────────────────────────────────────────────────────────────────
 
-  if (args.name) q = q.ilike('name', `%${args.name}%`);
-  q = q.limit(30);
+async function execGetProductionOrders(sb: any, args: { status?: string; branch_name?: string; limit?: number }): Promise<string> {
+  const statusLabels: Record<string, string> = {
+    PENDING: '대기', IN_PROGRESS: '진행중', COMPLETED: '완료', CANCELLED: '취소',
+  };
+
+  let branchId: string | null = null;
+  if (args.branch_name) {
+    const b = await findBranch(sb, args.branch_name);
+    if (!b) return JSON.stringify({ error: `지점 "${args.branch_name}" 없음` });
+    branchId = b.id;
+  }
+
+  let q = (sb as any).from('production_orders')
+    .select('order_number, status, quantity, memo, started_at, created_at, products(name), branches(name)')
+    .order('created_at', { ascending: false });
+  if (args.status) q = q.eq('status', args.status);
+  if (branchId) q = q.eq('branch_id', branchId);
+  q = q.limit(args.limit || 20);
 
   const { data, error } = await q;
   if (error) return JSON.stringify({ error: error.message });
-  return JSON.stringify(data || []);
+  if (!data?.length) return JSON.stringify({ 결과: '생산 지시서 없음' });
+
+  return JSON.stringify(((data || []) as any[]).map(o => ({
+    지시번호: o.order_number,
+    제품: o.products?.name || '-',
+    지점: o.branches?.name || '-',
+    수량: o.quantity,
+    상태: statusLabels[o.status] || o.status,
+    착수일: o.started_at?.slice(0, 10) || '-',
+    생성일: o.created_at?.slice(0, 10),
+    메모: o.memo || '-',
+  })));
 }
 
-async function execTransferInventory(supabase: any, args: {
-  from_branch_name: string;
-  to_branch_name: string;
-  product_name: string;
-  quantity: number;
-}): Promise<string> {
-  const fromBranch = await findBranchId(supabase, args.from_branch_name);
-  if (!fromBranch) return JSON.stringify({ error: `출발 지점 "${args.from_branch_name}" 없음` });
+// ── 재고 쓰기 ────────────────────────────────────────────────────────────────
 
-  const toBranch = await findBranchId(supabase, args.to_branch_name);
-  if (!toBranch) return JSON.stringify({ error: `도착 지점 "${args.to_branch_name}" 없음` });
+async function execAdjustInventory(sb: any, args: { branch_name: string; product_name: string; movement_type: string; quantity: number; memo?: string }): Promise<string> {
+  const branch = await findBranch(sb, args.branch_name);
+  if (!branch) return JSON.stringify({ error: `지점 "${args.branch_name}" 없음` });
 
-  const product = await findProductId(supabase, args.product_name);
+  const product = await findProduct(sb, args.product_name);
   if (!product) return JSON.stringify({ error: `제품 "${args.product_name}" 없음` });
 
-  // Check source stock
-  const { data: srcInv } = await supabase
-    .from('inventories')
-    .select('id, quantity')
-    .eq('branch_id', fromBranch.id)
-    .eq('product_id', product.id)
-    .single();
+  const { data: inv } = await sb.from('inventories').select('id, quantity').eq('branch_id', branch.id).eq('product_id', product.id).single();
 
-  if (!srcInv || srcInv.quantity < args.quantity) {
-    return JSON.stringify({
-      error: `${fromBranch.name}의 ${product.name} 재고 부족. 현재: ${srcInv?.quantity ?? 0}개, 요청: ${args.quantity}개`,
-    });
-  }
+  let newQty: number;
+  const current = (inv as any)?.quantity || 0;
 
-  // Decrement source
-  await supabase
-    .from('inventories')
-    .update({ quantity: srcInv.quantity - args.quantity })
-    .eq('id', srcInv.id);
-
-  // Increment destination (upsert)
-  const { data: dstInv } = await supabase
-    .from('inventories')
-    .select('id, quantity')
-    .eq('branch_id', toBranch.id)
-    .eq('product_id', product.id)
-    .single();
-
-  if (dstInv) {
-    await supabase
-      .from('inventories')
-      .update({ quantity: dstInv.quantity + args.quantity })
-      .eq('id', dstInv.id);
+  if (args.movement_type === 'IN') newQty = current + args.quantity;
+  else if (args.movement_type === 'OUT') {
+    if (current < args.quantity) return JSON.stringify({ error: `재고 부족. 현재: ${current}개, 요청: ${args.quantity}개` });
+    newQty = current - args.quantity;
   } else {
-    await supabase
-      .from('inventories')
-      .insert({ branch_id: toBranch.id, product_id: product.id, quantity: args.quantity });
+    newQty = args.quantity; // ADJUST
   }
 
-  // Movement records
+  if (inv) {
+    await sb.from('inventories').update({ quantity: newQty }).eq('id', (inv as any).id);
+  } else {
+    await sb.from('inventories').insert({ branch_id: branch.id, product_id: product.id, quantity: newQty, safety_stock: 0 });
+  }
+
+  const typeLabel: Record<string, string> = { IN: '입고', OUT: '출고', ADJUST: '재고실사' };
+  await sb.from('inventory_movements').insert({
+    branch_id: branch.id, product_id: product.id,
+    movement_type: args.movement_type,
+    quantity: args.movement_type === 'OUT' ? -args.quantity : args.quantity,
+    memo: (args.memo || `AI 에이전트 ${typeLabel[args.movement_type] || args.movement_type}`),
+  });
+
+  return JSON.stringify({
+    성공: true,
+    메시지: `${branch.name} · ${product.name} ${typeLabel[args.movement_type] || args.movement_type} ${args.quantity}개 처리 완료`,
+    이전재고: current, 변경후재고: newQty,
+  });
+}
+
+async function execTransferInventory(sb: any, args: { from_branch_name: string; to_branch_name: string; product_name: string; quantity: number }): Promise<string> {
+  const from = await findBranch(sb, args.from_branch_name);
+  if (!from) return JSON.stringify({ error: `출발 지점 "${args.from_branch_name}" 없음` });
+  const to = await findBranch(sb, args.to_branch_name);
+  if (!to) return JSON.stringify({ error: `도착 지점 "${args.to_branch_name}" 없음` });
+  const product = await findProduct(sb, args.product_name);
+  if (!product) return JSON.stringify({ error: `제품 "${args.product_name}" 없음` });
+
+  const { data: srcInv } = await sb.from('inventories').select('id, quantity').eq('branch_id', from.id).eq('product_id', product.id).single();
+  if (!(srcInv as any) || (srcInv as any).quantity < args.quantity) {
+    return JSON.stringify({ error: `${from.name} 재고 부족. 현재: ${(srcInv as any)?.quantity ?? 0}개, 요청: ${args.quantity}개` });
+  }
+
+  await sb.from('inventories').update({ quantity: (srcInv as any).quantity - args.quantity }).eq('id', (srcInv as any).id);
+
+  const { data: dstInv } = await sb.from('inventories').select('id, quantity').eq('branch_id', to.id).eq('product_id', product.id).single();
+  if (dstInv) {
+    await sb.from('inventories').update({ quantity: (dstInv as any).quantity + args.quantity }).eq('id', (dstInv as any).id);
+  } else {
+    await sb.from('inventories').insert({ branch_id: to.id, product_id: product.id, quantity: args.quantity, safety_stock: 0 });
+  }
+
   const now = new Date().toISOString();
-  await supabase.from('inventory_movements').insert([
-    {
-      branch_id: fromBranch.id,
-      product_id: product.id,
-      movement_type: 'TRANSFER',
-      quantity: -args.quantity,
-      memo: `이동출고 → ${toBranch.name} (AI 에이전트)`,
-      created_at: now,
-    },
-    {
-      branch_id: toBranch.id,
-      product_id: product.id,
-      movement_type: 'TRANSFER',
-      quantity: args.quantity,
-      memo: `이동입고 ← ${fromBranch.name} (AI 에이전트)`,
-      created_at: now,
-    },
+  await sb.from('inventory_movements').insert([
+    { branch_id: from.id, product_id: product.id, movement_type: 'TRANSFER', quantity: -args.quantity, memo: `이동출고 → ${to.name} (AI)`, created_at: now },
+    { branch_id: to.id, product_id: product.id, movement_type: 'TRANSFER', quantity: args.quantity, memo: `이동입고 ← ${from.name} (AI)`, created_at: now },
   ]);
 
   return JSON.stringify({
     성공: true,
-    메시지: `${product.name} ${args.quantity}개를 ${fromBranch.name}에서 ${toBranch.name}으로 이동했습니다.`,
-    출발지잔여재고: srcInv.quantity - args.quantity,
+    메시지: `${product.name} ${args.quantity}개 이동 완료 (${from.name} → ${to.name})`,
+    출발지잔여: (srcInv as any).quantity - args.quantity,
   });
 }
 
-async function execAdjustPoints(supabase: any, args: {
-  customer_name?: string;
-  phone?: string;
-  points: number;
-  reason: string;
-}): Promise<string> {
-  const customer = await findCustomer(supabase, args);
-  if (!customer) return JSON.stringify({ error: '고객을 찾을 수 없습니다.' });
+// ── 고객 쓰기 ────────────────────────────────────────────────────────────────
 
-  const currentBalance = await getCustomerPoints(supabase, customer.id);
-  const newBalance = currentBalance + args.points;
-
-  if (newBalance < 0) {
-    return JSON.stringify({ error: `포인트 부족. 현재: ${currentBalance}P, 차감: ${Math.abs(args.points)}P` });
-  }
-
-  await supabase.from('point_history').insert({
-    customer_id: customer.id,
-    type: args.points > 0 ? 'adjust' : 'adjust',
-    points: args.points,
-    balance: newBalance,
-    description: args.reason + ' (AI 에이전트)',
-  });
-
-  return JSON.stringify({
-    성공: true,
-    고객: customer.name,
-    조정전: currentBalance,
-    조정후: newBalance,
-    메시지: `${customer.name} 고객 포인트 ${args.points > 0 ? '+' : ''}${args.points}P 조정 완료`,
-  });
-}
-
-async function execUpdateCustomerGrade(supabase: any, args: {
-  customer_name?: string;
-  phone?: string;
-  new_grade: string;
-}): Promise<string> {
-  const customer = await findCustomer(supabase, args);
-  if (!customer) return JSON.stringify({ error: '고객을 찾을 수 없습니다.' });
-
-  const gradeNames: Record<string, string> = { NORMAL: '일반', VIP: 'VIP', VVIP: 'VVIP' };
-  const prevGrade = customer.grade;
-
-  await supabase
-    .from('customers')
-    .update({ grade: args.new_grade })
-    .eq('id', customer.id);
-
-  return JSON.stringify({
-    성공: true,
-    고객: customer.name,
-    이전등급: gradeNames[prevGrade] || prevGrade,
-    변경등급: gradeNames[args.new_grade] || args.new_grade,
-    메시지: `${customer.name} 고객 등급을 ${gradeNames[prevGrade] || prevGrade}에서 ${gradeNames[args.new_grade] || args.new_grade}로 변경했습니다.`,
-  });
-}
-
-async function execGetBranches(supabase: any, args: { name?: string }): Promise<string> {
-  let q = supabase.from('branches').select('name, code, channel, address, phone, is_active').order('created_at');
-  if (args.name) q = q.ilike('name', `%${args.name}%`);
-  const { data, error } = await q.limit(30);
-  if (error) return JSON.stringify({ error: error.message });
-  const channelNames: Record<string, string> = { STORE: '한약국', DEPT_STORE: '백화점', ONLINE: '자사몰', EVENT: '이벤트' };
-  return JSON.stringify((data || []).map((b: any) => ({
-    지점명: b.name,
-    코드: b.code,
-    채널: channelNames[b.channel] || b.channel,
-    주소: b.address || '-',
-    전화: b.phone || '-',
-    상태: b.is_active ? '운영중' : '비활성',
-  })));
-}
-
-async function execCreateBranch(supabase: any, args: {
-  name: string;
-  channel: string;
-  address?: string;
-  phone?: string;
-}): Promise<string> {
-  const code = 'BR-' + Date.now().toString(36).toUpperCase();
-  const { error } = await supabase.from('branches').insert({
-    name: args.name,
-    code,
-    channel: args.channel,
-    address: args.address || null,
-    phone: args.phone || null,
-    is_active: true,
-  });
-  if (error) return JSON.stringify({ error: error.message });
-  return JSON.stringify({
-    성공: true,
-    메시지: `${args.name} 지점이 추가되었습니다.`,
-    지점코드: code,
-  });
-}
-
-async function execUpdateBranch(supabase: any, args: {
-  branch_name: string;
-  new_name?: string;
-  address?: string;
-  phone?: string;
-  is_active?: boolean;
-}): Promise<string> {
-  const branch = await findBranchId(supabase, args.branch_name);
-  if (!branch) return JSON.stringify({ error: `지점 "${args.branch_name}"을(를) 찾을 수 없습니다.` });
-
-  const updates: Record<string, any> = {};
-  if (args.new_name !== undefined) updates.name = args.new_name;
-  if (args.address !== undefined) updates.address = args.address;
-  if (args.phone !== undefined) updates.phone = args.phone;
-  if (args.is_active !== undefined) updates.is_active = args.is_active;
-
-  const { error } = await supabase.from('branches').update(updates).eq('id', branch.id);
-  if (error) return JSON.stringify({ error: error.message });
-  return JSON.stringify({ 성공: true, 메시지: `${branch.name} 지점 정보가 수정되었습니다.` });
-}
-
-async function execCreateCustomer(supabase: any, args: {
-  name: string;
-  phone: string;
-  grade?: string;
-  email?: string;
-  address?: string;
-  health_note?: string;
-}): Promise<string> {
-  const { error } = await supabase.from('customers').insert({
-    name: args.name,
-    phone: args.phone,
+async function execCreateCustomer(sb: any, args: any): Promise<string> {
+  const { error } = await sb.from('customers').insert({
+    name: args.name, phone: args.phone,
     grade: args.grade || 'NORMAL',
-    email: args.email || null,
-    address: args.address || null,
-    health_note: args.health_note || null,
-    is_active: true,
+    email: args.email || null, address: args.address || null,
+    health_note: args.health_note || null, is_active: true,
   });
   if (error) {
-    if (error.message.includes('unique') || error.message.includes('duplicate')) {
-      return JSON.stringify({ error: `전화번호 ${args.phone}은(는) 이미 등록된 고객입니다.` });
-    }
+    if (error.message.includes('unique') || error.message.includes('duplicate'))
+      return JSON.stringify({ error: `${args.phone}은 이미 등록된 번호입니다.` });
     return JSON.stringify({ error: error.message });
   }
-  return JSON.stringify({
-    성공: true,
-    메시지: `${args.name} 고객이 등록되었습니다.`,
-  });
+  return JSON.stringify({ 성공: true, 메시지: `${args.name} 고객 등록 완료` });
 }
 
-async function execUpdateCustomer(supabase: any, args: {
-  customer_name?: string;
-  phone?: string;
-  new_phone?: string;
-  email?: string;
-  address?: string;
-  health_note?: string;
-  grade?: string;
-}): Promise<string> {
-  const customer = await findCustomer(supabase, args);
+async function execUpdateCustomer(sb: any, args: any): Promise<string> {
+  const customer = await findCustomer(sb, args);
   if (!customer) return JSON.stringify({ error: '고객을 찾을 수 없습니다.' });
 
   const updates: Record<string, any> = {};
@@ -752,7 +1009,449 @@ async function execUpdateCustomer(supabase: any, args: {
   if (args.health_note !== undefined) updates.health_note = args.health_note;
   if (args.grade !== undefined) updates.grade = args.grade;
 
-  const { error } = await supabase.from('customers').update(updates).eq('id', customer.id);
+  const { error } = await sb.from('customers').update(updates).eq('id', customer.id);
   if (error) return JSON.stringify({ error: error.message });
-  return JSON.stringify({ 성공: true, 메시지: `${customer.name} 고객 정보가 수정되었습니다.` });
+  return JSON.stringify({ 성공: true, 메시지: `${customer.name} 고객 정보 수정 완료` });
+}
+
+async function execUpdateCustomerGrade(sb: any, args: any): Promise<string> {
+  const customer = await findCustomer(sb, args);
+  if (!customer) return JSON.stringify({ error: '고객을 찾을 수 없습니다.' });
+
+  const gradeLabels: Record<string, string> = { NORMAL: '일반', VIP: 'VIP', VVIP: 'VVIP' };
+  await sb.from('customers').update({ grade: args.new_grade }).eq('id', customer.id);
+  return JSON.stringify({
+    성공: true,
+    메시지: `${customer.name} 등급 변경 완료: ${gradeLabels[customer.grade] || customer.grade} → ${gradeLabels[args.new_grade] || args.new_grade}`,
+  });
+}
+
+async function execUpgradeCustomerGrades(sb: any): Promise<string> {
+  const { data: customers } = await sb.from('customers').select('id, name, grade').eq('is_active', true);
+  if (!customers?.length) return JSON.stringify({ 결과: '활성 고객 없음' });
+
+  let upgraded = 0;
+  const details: string[] = [];
+  const gradeLabels: Record<string, string> = { NORMAL: '일반', VIP: 'VIP', VVIP: 'VVIP' };
+
+  for (const c of customers as any[]) {
+    const { data: orders } = await sb.from('sales_orders')
+      .select('total_amount').eq('customer_id', c.id).eq('status', 'COMPLETED');
+    const total = ((orders || []) as any[]).reduce((s: number, o: any) => s + (o.total_amount || 0), 0);
+
+    let newGrade = c.grade;
+    if (total >= 3_000_000 && c.grade !== 'VVIP') newGrade = 'VVIP';
+    else if (total >= 1_000_000 && c.grade === 'NORMAL') newGrade = 'VIP';
+
+    if (newGrade !== c.grade) {
+      await sb.from('customers').update({ grade: newGrade }).eq('id', c.id);
+      upgraded++;
+      details.push(`${c.name}: ${gradeLabels[c.grade]} → ${gradeLabels[newGrade]} (누적 ${total.toLocaleString()}원)`);
+    }
+  }
+
+  return JSON.stringify({
+    성공: true,
+    업그레이드건수: upgraded,
+    메시지: upgraded > 0 ? `${upgraded}명 등급 업그레이드 완료` : '업그레이드 대상 없음',
+    상세: details,
+  });
+}
+
+async function execAdjustPoints(sb: any, args: any): Promise<string> {
+  const customer = await findCustomer(sb, args);
+  if (!customer) return JSON.stringify({ error: '고객을 찾을 수 없습니다.' });
+
+  const current = await getPoints(sb, customer.id);
+  const newBalance = current + args.points;
+  if (newBalance < 0) return JSON.stringify({ error: `포인트 부족. 현재: ${current}P, 차감: ${Math.abs(args.points)}P` });
+
+  await sb.from('point_history').insert({
+    customer_id: customer.id, type: 'adjust',
+    points: args.points, balance: newBalance,
+    description: `${args.reason} (AI 에이전트)`,
+  });
+
+  return JSON.stringify({
+    성공: true,
+    메시지: `${customer.name} 포인트 ${args.points > 0 ? '+' : ''}${args.points}P 조정 완료`,
+    이전잔액: `${current}P`, 변경후잔액: `${newBalance}P`,
+  });
+}
+
+// ── 지점/제품 쓰기 ───────────────────────────────────────────────────────────
+
+async function execCreateBranch(sb: any, args: any): Promise<string> {
+  const code = 'BR-' + Date.now().toString(36).toUpperCase();
+  const { error } = await sb.from('branches').insert({
+    name: args.name, code, channel: args.channel,
+    address: args.address || null, phone: args.phone || null, is_active: true,
+  });
+  if (error) return JSON.stringify({ error: error.message });
+  return JSON.stringify({ 성공: true, 메시지: `${args.name} 지점 추가 완료`, 지점코드: code });
+}
+
+async function execUpdateBranch(sb: any, args: any): Promise<string> {
+  const branch = await findBranch(sb, args.branch_name);
+  if (!branch) return JSON.stringify({ error: `지점 "${args.branch_name}" 없음` });
+
+  const updates: Record<string, any> = {};
+  if (args.new_name !== undefined) updates.name = args.new_name;
+  if (args.address !== undefined) updates.address = args.address;
+  if (args.phone !== undefined) updates.phone = args.phone;
+  if (args.is_active !== undefined) updates.is_active = args.is_active;
+
+  const { error } = await sb.from('branches').update(updates).eq('id', branch.id);
+  if (error) return JSON.stringify({ error: error.message });
+  return JSON.stringify({ 성공: true, 메시지: `${branch.name} 지점 수정 완료` });
+}
+
+async function execCreateProduct(sb: any, args: any): Promise<string> {
+  const code = `KYO-${Date.now().toString(36).toUpperCase()}`;
+  const { data: product, error } = await sb.from('products').insert({
+    name: args.name, code, price: args.price,
+    cost: args.cost || null, unit: args.unit || '개',
+    barcode: args.barcode || null, is_active: true,
+  }).select('id').single();
+
+  if (error) return JSON.stringify({ error: error.message });
+
+  // 모든 활성 지점에 재고 레코드 생성
+  const { data: branches } = await sb.from('branches').select('id').eq('is_active', true);
+  if (branches?.length && (product as any)?.id) {
+    const invRecords = (branches as any[]).map(b => ({
+      branch_id: b.id, product_id: (product as any).id, quantity: 0, safety_stock: 0,
+    }));
+    await sb.from('inventories').insert(invRecords);
+  }
+
+  return JSON.stringify({ 성공: true, 메시지: `${args.name} 제품 등록 완료`, 제품코드: code });
+}
+
+// ── 매입(발주) 쓰기 ──────────────────────────────────────────────────────────
+
+async function execCreatePurchaseOrder(sb: any, args: any): Promise<string> {
+  // 공급업체 찾기
+  const { data: supplier } = await sb.from('suppliers').select('id, name').ilike('name', `%${args.supplier_name}%`).eq('is_active', true).limit(1).single();
+  if (!supplier) return JSON.stringify({ error: `공급업체 "${args.supplier_name}" 없음. get_suppliers로 목록 확인 후 정확한 이름 사용.` });
+
+  const branch = await findBranch(sb, args.branch_name);
+  if (!branch) return JSON.stringify({ error: `지점 "${args.branch_name}" 없음` });
+
+  const product = await findProduct(sb, args.product_name);
+  if (!product) return JSON.stringify({ error: `제품 "${args.product_name}" 없음` });
+
+  const today = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+  const suffix = Math.random().toString(36).substring(2, 5).toUpperCase();
+  const orderNumber = `PO-${today}-${suffix}`;
+  const totalAmount = args.quantity * args.unit_price;
+
+  const { data: po, error } = await (sb as any).from('purchase_orders').insert({
+    order_number: orderNumber,
+    supplier_id: (supplier as any).id,
+    branch_id: branch.id,
+    status: 'DRAFT',
+    total_amount: totalAmount,
+    ordered_at: new Date().toISOString(),
+    memo: args.memo || null,
+  }).select('id').single();
+
+  if (error) return JSON.stringify({ error: error.message });
+
+  await (sb as any).from('purchase_order_items').insert({
+    purchase_order_id: (po as any).id,
+    product_id: product.id,
+    ordered_quantity: args.quantity,
+    received_quantity: 0,
+    unit_price: args.unit_price,
+  });
+
+  return JSON.stringify({
+    성공: true,
+    메시지: `발주서 작성 완료 (초안 상태)`,
+    발주번호: orderNumber,
+    공급업체: (supplier as any).name,
+    제품: product.name,
+    수량: args.quantity,
+    단가: `${args.unit_price.toLocaleString()}원`,
+    합계: `${totalAmount.toLocaleString()}원`,
+    안내: '확정하려면 confirm_purchase_order를 사용하세요.',
+  });
+}
+
+async function execConfirmPurchaseOrder(sb: any, args: { order_number: string }): Promise<string> {
+  const { data: po } = await (sb as any).from('purchase_orders').select('id, status, order_number').eq('order_number', args.order_number).single();
+  if (!po) return JSON.stringify({ error: `발주서 "${args.order_number}" 없음` });
+  if ((po as any).status !== 'DRAFT') return JSON.stringify({ error: `이미 "${(po as any).status}" 상태. DRAFT 상태만 확정 가능.` });
+
+  const { error } = await (sb as any).from('purchase_orders').update({ status: 'CONFIRMED' }).eq('id', (po as any).id);
+  if (error) return JSON.stringify({ error: error.message });
+  return JSON.stringify({ 성공: true, 메시지: `발주서 ${args.order_number} 확정 완료. 이제 입고 처리 가능.` });
+}
+
+async function execReceivePurchaseOrder(sb: any, args: { order_number: string; memo?: string }): Promise<string> {
+  const { data: po } = await (sb as any).from('purchase_orders')
+    .select('id, status, branch_id, order_number, branches(name)')
+    .eq('order_number', args.order_number).single();
+  if (!po) return JSON.stringify({ error: `발주서 "${args.order_number}" 없음` });
+  if (!['CONFIRMED', 'PARTIALLY_RECEIVED'].includes((po as any).status))
+    return JSON.stringify({ error: `입고 불가 상태: ${(po as any).status}. CONFIRMED 또는 PARTIALLY_RECEIVED 상태만 가능.` });
+
+  // 발주 항목 가져오기
+  const { data: items } = await (sb as any).from('purchase_order_items')
+    .select('id, product_id, ordered_quantity, received_quantity, unit_price, products(name)')
+    .eq('purchase_order_id', (po as any).id);
+
+  if (!items?.length) return JSON.stringify({ error: '발주 항목이 없습니다.' });
+
+  const today = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+  const suffix = Math.random().toString(36).substring(2, 5).toUpperCase();
+  const receiptNumber = `GR-${today}-${suffix}`;
+
+  // 입고 전표 생성
+  const totalAmount = (items as any[]).reduce((s, i) => s + i.unit_price * i.ordered_quantity, 0);
+  const { data: receipt, error: receiptErr } = await (sb as any).from('purchase_receipts').insert({
+    purchase_order_id: (po as any).id,
+    receipt_number: receiptNumber,
+    branch_id: (po as any).branch_id,
+    total_amount: totalAmount,
+    received_at: new Date().toISOString(),
+    memo: args.memo || `AI 에이전트 입고 처리`,
+  }).select('id').single();
+  if (receiptErr) return JSON.stringify({ error: receiptErr.message });
+
+  // 각 항목 입고 처리
+  const receivedDetails: string[] = [];
+  for (const item of items as any[]) {
+    const qty = item.ordered_quantity - item.received_quantity;
+    if (qty <= 0) continue;
+
+    // 입고 항목 생성
+    await (sb as any).from('purchase_receipt_items').insert({
+      purchase_receipt_id: (receipt as any).id,
+      product_id: item.product_id,
+      quantity: qty, unit_price: item.unit_price,
+    });
+
+    // 재고 증가
+    const { data: inv } = await sb.from('inventories').select('id, quantity').eq('branch_id', (po as any).branch_id).eq('product_id', item.product_id).single();
+    if (inv) {
+      await sb.from('inventories').update({ quantity: (inv as any).quantity + qty }).eq('id', (inv as any).id);
+    } else {
+      await sb.from('inventories').insert({ branch_id: (po as any).branch_id, product_id: item.product_id, quantity: qty, safety_stock: 0 });
+    }
+
+    // 재고 이동 기록
+    await sb.from('inventory_movements').insert({
+      branch_id: (po as any).branch_id, product_id: item.product_id,
+      movement_type: 'IN', quantity: qty,
+      reference_id: (po as any).id, reference_type: 'PURCHASE_RECEIPT',
+      memo: `입고 ${receiptNumber} (AI)`,
+    });
+
+    // 발주 항목 수량 업데이트
+    await (sb as any).from('purchase_order_items').update({ received_quantity: item.ordered_quantity }).eq('id', item.id);
+    receivedDetails.push(`${item.products?.name} ${qty}개`);
+  }
+
+  // 발주서 상태 완료로 변경
+  await (sb as any).from('purchase_orders').update({ status: 'RECEIVED' }).eq('id', (po as any).id);
+
+  return JSON.stringify({
+    성공: true,
+    메시지: `${args.order_number} 입고 처리 완료`,
+    입고전표: receiptNumber,
+    입고항목: receivedDetails,
+    지점: (po as any).branches?.name,
+  });
+}
+
+// ── 생산 쓰기 ────────────────────────────────────────────────────────────────
+
+async function execCreateProductionOrder(sb: any, args: any): Promise<string> {
+  const product = await findProduct(sb, args.product_name);
+  if (!product) return JSON.stringify({ error: `제품 "${args.product_name}" 없음` });
+
+  const branch = await findBranch(sb, args.branch_name);
+  if (!branch) return JSON.stringify({ error: `지점 "${args.branch_name}" 없음` });
+
+  // BOM 확인
+  const { data: bom } = await (sb as any).from('bom')
+    .select('quantity_required, products!bom_material_id_fkey(name)')
+    .eq('product_id', product.id);
+  if (!bom?.length) return JSON.stringify({ error: `${product.name}의 BOM(원재료 목록)이 없습니다. 생산 메뉴에서 BOM을 먼저 등록하세요.` });
+
+  const today = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+  const suffix = Math.random().toString(36).substring(2, 5).toUpperCase();
+  const orderNumber = `WO-${today}-${suffix}`;
+
+  const { error } = await (sb as any).from('production_orders').insert({
+    order_number: orderNumber,
+    product_id: product.id,
+    branch_id: branch.id,
+    quantity: args.quantity,
+    status: 'PENDING',
+    memo: args.memo || null,
+  });
+  if (error) return JSON.stringify({ error: error.message });
+
+  const bomSummary = (bom as any[]).map(b => `${b.products?.name} × ${b.quantity_required * args.quantity}`).join(', ');
+  return JSON.stringify({
+    성공: true,
+    메시지: `생산 지시서 생성 완료`,
+    지시번호: orderNumber,
+    제품: product.name, 수량: args.quantity, 지점: branch.name,
+    소요재료: bomSummary,
+    안내: '착수하려면 start_production_order를 사용하세요.',
+  });
+}
+
+async function execStartProductionOrder(sb: any, args: { order_number: string }): Promise<string> {
+  const { data: po } = await (sb as any).from('production_orders').select('id, status').eq('order_number', args.order_number).single();
+  if (!po) return JSON.stringify({ error: `생산 지시서 "${args.order_number}" 없음` });
+  if ((po as any).status !== 'PENDING') return JSON.stringify({ error: `현재 상태: ${(po as any).status}. PENDING 상태만 착수 가능.` });
+
+  await (sb as any).from('production_orders').update({ status: 'IN_PROGRESS', started_at: new Date().toISOString() }).eq('id', (po as any).id);
+  return JSON.stringify({ 성공: true, 메시지: `${args.order_number} 생산 착수 완료 (PENDING → 진행중)` });
+}
+
+async function execCompleteProductionOrder(sb: any, args: { order_number: string }): Promise<string> {
+  const { data: po } = await (sb as any).from('production_orders')
+    .select('id, status, product_id, branch_id, quantity, products(name), branches(name)')
+    .eq('order_number', args.order_number).single();
+
+  if (!po) return JSON.stringify({ error: `생산 지시서 "${args.order_number}" 없음` });
+  if ((po as any).status !== 'IN_PROGRESS') return JSON.stringify({ error: `현재 상태: ${(po as any).status}. IN_PROGRESS 상태만 완료 가능.` });
+
+  // BOM 조회
+  const { data: bom } = await (sb as any).from('bom')
+    .select('material_id, quantity_required, products!bom_material_id_fkey(name)')
+    .eq('product_id', (po as any).product_id);
+
+  if (!bom?.length) return JSON.stringify({ error: 'BOM이 없어 완료 처리 불가' });
+
+  // 원재료 재고 확인
+  for (const item of bom as any[]) {
+    const needed = item.quantity_required * (po as any).quantity;
+    const { data: inv } = await sb.from('inventories').select('quantity').eq('branch_id', (po as any).branch_id).eq('product_id', item.material_id).single();
+    if (!(inv as any) || (inv as any).quantity < needed) {
+      return JSON.stringify({ error: `재료 부족: ${item.products?.name} 필요 ${needed}개, 현재 ${(inv as any)?.quantity ?? 0}개` });
+    }
+  }
+
+  // 원재료 차감
+  for (const item of bom as any[]) {
+    const needed = item.quantity_required * (po as any).quantity;
+    const { data: inv } = await sb.from('inventories').select('id, quantity').eq('branch_id', (po as any).branch_id).eq('product_id', item.material_id).single();
+    await sb.from('inventories').update({ quantity: (inv as any).quantity - needed }).eq('id', (inv as any).id);
+    await sb.from('inventory_movements').insert({
+      branch_id: (po as any).branch_id, product_id: item.material_id,
+      movement_type: 'PRODUCTION', quantity: -needed,
+      reference_id: (po as any).id, reference_type: 'PRODUCTION',
+      memo: `생산 원재료 사용 ${args.order_number} (AI)`,
+    });
+  }
+
+  // 완제품 재고 증가
+  const { data: finInv } = await sb.from('inventories').select('id, quantity').eq('branch_id', (po as any).branch_id).eq('product_id', (po as any).product_id).single();
+  if (finInv) {
+    await sb.from('inventories').update({ quantity: (finInv as any).quantity + (po as any).quantity }).eq('id', (finInv as any).id);
+  } else {
+    await sb.from('inventories').insert({ branch_id: (po as any).branch_id, product_id: (po as any).product_id, quantity: (po as any).quantity, safety_stock: 0 });
+  }
+  await sb.from('inventory_movements').insert({
+    branch_id: (po as any).branch_id, product_id: (po as any).product_id,
+    movement_type: 'PRODUCTION', quantity: (po as any).quantity,
+    reference_id: (po as any).id, reference_type: 'PRODUCTION',
+    memo: `생산 완제품 입고 ${args.order_number} (AI)`,
+  });
+
+  // 상태 완료
+  await (sb as any).from('production_orders').update({ status: 'COMPLETED', completed_at: new Date().toISOString() }).eq('id', (po as any).id);
+
+  return JSON.stringify({
+    성공: true,
+    메시지: `${args.order_number} 생산 완료 처리`,
+    완제품: (po as any).products?.name, 생산량: (po as any).quantity,
+    지점: (po as any).branches?.name,
+    처리내용: '원재료 재고 차감 + 완제품 재고 증가 완료',
+  });
+}
+
+// ── SMS 발송 ─────────────────────────────────────────────────────────────────
+
+async function execSendSms(sb: any, args: { customer_name?: string; phone?: string; message: string }): Promise<string> {
+  const SOLAPI_API_KEY = process.env.SOLAPI_API_KEY;
+  const SOLAPI_API_SECRET = process.env.SOLAPI_API_SECRET;
+  const SOLAPI_SENDER = process.env.SOLAPI_SENDER_PHONE;
+
+  let recipientPhone = args.phone;
+  let recipientName = '';
+
+  if (!recipientPhone && args.customer_name) {
+    const customer = await findCustomer(sb, { name: args.customer_name });
+    if (!customer) return JSON.stringify({ error: `고객 "${args.customer_name}"을 찾을 수 없습니다.` });
+    recipientPhone = customer.phone;
+    recipientName = customer.name;
+  }
+
+  if (!recipientPhone) return JSON.stringify({ error: '수신자 전화번호 또는 고객 이름이 필요합니다.' });
+
+  // DB 기록 (Solapi 설정 여부와 무관하게)
+  if (recipientName) {
+    const { data: cust } = await sb.from('customers').select('id').eq('phone', recipientPhone).single();
+    if (cust) {
+      await sb.from('notifications').insert({
+        customer_id: (cust as any).id,
+        type: 'SMS',
+        message: args.message,
+        status: SOLAPI_API_KEY ? 'pending' : 'sent',
+        sent_at: new Date().toISOString(),
+      });
+    }
+  }
+
+  if (!SOLAPI_API_KEY || !SOLAPI_API_SECRET || !SOLAPI_SENDER) {
+    return JSON.stringify({
+      결과: 'DB 기록 완료 (실제 발송 미설정)',
+      안내: 'Solapi API 키가 설정되지 않아 실제 발송은 되지 않았습니다. .env.local에 SOLAPI_API_KEY, SOLAPI_API_SECRET, SOLAPI_SENDER_PHONE을 설정하세요.',
+      수신자: recipientPhone, 내용: args.message,
+    });
+  }
+
+  // Solapi 발송
+  try {
+    const date = new Date().toISOString();
+    const salt = Math.random().toString(36).substring(2, 12);
+    const hmacData = date + salt;
+    const { createHmac } = await import('crypto');
+    const signature = createHmac('sha256', SOLAPI_API_SECRET).update(hmacData).digest('hex');
+
+    const msgType = Buffer.byteLength(args.message, 'utf8') > 90 ? 'LMS' : 'SMS';
+
+    const res = await fetch('https://api.solapi.com/messages/v4/send', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `HMAC-SHA256 apiKey=${SOLAPI_API_KEY}, date=${date}, salt=${salt}, signature=${signature}`,
+      },
+      body: JSON.stringify({
+        message: { to: recipientPhone, from: SOLAPI_SENDER, text: args.message, type: msgType },
+      }),
+    });
+
+    const result = await res.json() as any;
+
+    if (result.errorCode || !res.ok) {
+      return JSON.stringify({ error: `Solapi 발송 오류: ${result.errorMessage || result.errorCode || '알 수 없는 오류'}` });
+    }
+
+    return JSON.stringify({
+      성공: true,
+      메시지: `SMS 발송 완료`,
+      수신자: recipientPhone, 내용미리보기: args.message.slice(0, 30) + (args.message.length > 30 ? '...' : ''),
+    });
+  } catch (e: any) {
+    return JSON.stringify({ error: `발송 오류: ${e.message}` });
+  }
 }
