@@ -44,7 +44,6 @@ export default function InventoryModal({ inventory, onClose, onSuccess }: Props)
   }, []);
 
   const loadProducts = async () => {
-    const supabase = (window as any).createClient?.() || {};
     const { createClient } = await import('@/lib/supabase/client');
     const client = createClient();
     const { data } = await client.from('products').select('id, name, code').eq('is_active', true).order('name');

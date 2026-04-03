@@ -12,6 +12,12 @@ const STATUS_BADGE: Record<string, string> = {
   pending: 'bg-amber-100 text-amber-700',
   failed:  'bg-red-100 text-red-600',
 };
+const GRADE_LABELS: Record<string, string> = { VVIP: 'VVIP', VIP: 'VIP', NORMAL: '일반' };
+const GRADE_BADGE: Record<string, string> = {
+  VVIP: 'bg-red-100 text-red-700',
+  VIP:  'bg-amber-100 text-amber-700',
+  NORMAL: 'bg-slate-100 text-slate-500',
+};
 
 export default function NotificationsPage() {
   const [notifications, setNotifications] = useState<any[]>([]);
@@ -184,6 +190,7 @@ function SendModal({ type, templates, customers, onClose, onSuccess }: SendModal
   const [sendMode, setSendMode]                   = useState<'bulk' | 'single'>('bulk');
   const [selectedCustomerIds, setSelectedCustomerIds] = useState<string[]>([]);
   const [customerSearch, setCustomerSearch]       = useState('');
+  const [gradeFilter, setGradeFilter]             = useState('');
   const [phone, setPhone]                         = useState('');
   const [phoneError, setPhoneError]               = useState('');
   const [templateId, setTemplateId]               = useState('');
@@ -192,11 +199,14 @@ function SendModal({ type, templates, customers, onClose, onSuccess }: SendModal
   const [result, setResult]                       = useState<{ successCount: number; failCount: number } | null>(null);
 
   const filteredCustomers = customers
-    .filter(c =>
-      c.name.toLowerCase().includes(customerSearch.toLowerCase()) ||
-      c.phone.replace(/-/g, '').includes(customerSearch.replace(/-/g, ''))
-    )
-    .slice(0, 60);
+    .filter(c => {
+      const matchSearch = !customerSearch ||
+        c.name.toLowerCase().includes(customerSearch.toLowerCase()) ||
+        c.phone.replace(/-/g, '').includes(customerSearch.replace(/-/g, ''));
+      const matchGrade = !gradeFilter || c.grade === gradeFilter;
+      return matchSearch && matchGrade;
+    })
+    .slice(0, 100);
 
   const toggleCustomer = (id: string) =>
     setSelectedCustomerIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
@@ -286,20 +296,37 @@ function SendModal({ type, templates, customers, onClose, onSuccess }: SendModal
 
           {/* 수신자 선택 */}
           {sendMode === 'bulk' ? (
-            <div>
-              <div className="flex justify-between items-center mb-2">
-                <label className="text-sm font-medium">발송 대상 ({selectedCustomerIds.length}명 선택)</label>
+            <div className="space-y-2">
+              <div className="flex justify-between items-center">
+                <label className="text-sm font-medium">발송 대상 ({selectedCustomerIds.length}명 / 전체 {filteredCustomers.length}명)</label>
                 <div className="flex gap-3 text-xs">
                   <button onClick={() => setSelectedCustomerIds(filteredCustomers.map(c => c.id))} className="text-blue-600 hover:underline">전체 선택</button>
                   <button onClick={() => setSelectedCustomerIds([])} className="text-slate-500 hover:underline">선택 해제</button>
                 </div>
               </div>
+              {/* 등급 빠른 필터 */}
+              <div className="flex gap-1.5 flex-wrap">
+                {[['', '전체'], ['VVIP', 'VVIP'], ['VIP', 'VIP'], ['NORMAL', '일반']].map(([v, label]) => (
+                  <button
+                    key={v}
+                    onClick={() => { setGradeFilter(v); setSelectedCustomerIds([]); }}
+                    className={`px-2.5 py-1 text-xs rounded-full font-medium transition-colors ${
+                      gradeFilter === v
+                        ? 'bg-blue-600 text-white'
+                        : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                    }`}
+                  >
+                    {label}
+                    {v && <span className="ml-1 opacity-60">{customers.filter(c => c.grade === v).length}</span>}
+                  </button>
+                ))}
+              </div>
               <input
                 type="text"
-                placeholder="고객 검색 (이름/연락처)"
+                placeholder="이름 / 전화번호 검색"
                 value={customerSearch}
                 onChange={e => setCustomerSearch(e.target.value)}
-                className="input mb-2 text-sm"
+                className="input text-sm"
               />
               <div className="border rounded-lg max-h-52 overflow-auto">
                 {filteredCustomers.map(c => (
@@ -309,11 +336,9 @@ function SendModal({ type, templates, customers, onClose, onSuccess }: SendModal
                       <p className="text-sm font-medium truncate">{c.name}</p>
                       <p className="text-xs text-slate-400">{c.phone}</p>
                     </div>
-                    <span className={`shrink-0 px-1.5 py-0.5 text-xs rounded ${
-                      c.grade === 'VVIP' ? 'bg-red-100 text-red-700' :
-                      c.grade === 'VIP'  ? 'bg-amber-100 text-amber-700' :
-                      'bg-slate-100 text-slate-500'
-                    }`}>{c.grade}</span>
+                    <span className={`shrink-0 px-1.5 py-0.5 text-xs rounded ${GRADE_BADGE[c.grade] || 'bg-slate-100 text-slate-500'}`}>
+                      {GRADE_LABELS[c.grade] || c.grade}
+                    </span>
                   </label>
                 ))}
                 {filteredCustomers.length === 0 && (
@@ -358,11 +383,15 @@ function SendModal({ type, templates, customers, onClose, onSuccess }: SendModal
           <div>
             <div className="flex justify-between items-center mb-1">
               <label className="text-sm font-medium">메시지 *</label>
-              {type === 'sms' && (
-                <span className={`text-xs ${message.length > 80 ? 'text-amber-600' : 'text-slate-400'}`}>
-                  {message.length}자 {message.length > 80 ? '(LMS)' : '(SMS)'}
-                </span>
-              )}
+              {type === 'sms' && (() => {
+                const byteLen = new TextEncoder().encode(message).length;
+                const isLms = byteLen > 90;
+                return (
+                  <span className={`text-xs ${isLms ? 'text-amber-600' : 'text-slate-400'}`}>
+                    {message.length}자 ({byteLen}bytes) {isLms ? '→ LMS' : '→ SMS'}
+                  </span>
+                );
+              })()}
             </div>
             <textarea
               value={message}

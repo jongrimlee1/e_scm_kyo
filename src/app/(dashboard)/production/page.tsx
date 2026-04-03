@@ -221,7 +221,7 @@ export default function ProductionPage() {
                     </td>
                     <td className="text-sm text-slate-500">{new Date(order.created_at).toLocaleDateString('ko-KR')}</td>
                     <td className="text-sm text-slate-500">
-                      {order.produced_at ? new Date(order.produced_at).toLocaleDateString('ko-KR') : '-'}
+                      {order.completed_at ? new Date(order.completed_at).toLocaleDateString('ko-KR') : '-'}
                     </td>
                     <td>
                       <div className="flex gap-1">

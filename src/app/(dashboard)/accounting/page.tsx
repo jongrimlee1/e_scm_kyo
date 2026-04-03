@@ -192,7 +192,8 @@ export default function AccountingPage() {
             <button onClick={fetchPL} className="btn-primary px-5">조회</button>
             {[0, -1, -2].map(offset => {
               const { start, end } = getMonth(offset);
-              const label = offset === 0 ? '이번달' : offset === -1 ? '지난달' : `${new Date().getMonth() - 1}월`;
+              const d = new Date(); d.setMonth(d.getMonth() + offset);
+              const label = offset === 0 ? '이번달' : offset === -1 ? '지난달' : `${d.getMonth() + 1}월`;
               return (
                 <button key={offset} onClick={() => setPlRange({ start, end })}
                   className="text-xs text-blue-600 hover:underline">{label}</button>
