@@ -27,15 +27,35 @@ function isValidSelectQuery(sql: string): boolean {
 }
 
 function extractSqlFromResponse(response: string): string | null {
+  log('Extracting SQL from response:', response.substring(0, 300));
+  
   try {
-    const parsed = JSON.parse(response.replace(/```json\n?/g, '').replace(/\n?```/g, '').trim());
-    return parsed.sql || parsed.query || parsed.query_sql || null;
-  } catch (e) {
-    const sqlMatch = response.match(/(?:sql|query)["']?\s*[:=]\s*["']?([^"'`;]+)/i);
-    if (sqlMatch) return sqlMatch[1].trim();
+    const cleaned = response.replace(/```json\n?/g, '').replace(/\n?```/g, '').trim();
+    log('Cleaned response:', cleaned.substring(0, 200));
     
-    const selectMatch = response.match(/(SELECT\s+[^;]+)/i);
-    if (selectMatch) return selectMatch[1].trim();
+    const parsed = JSON.parse(cleaned);
+    log('Parsed JSON:', parsed);
+    return parsed.sql || parsed.query || parsed.query_sql || parsed.SQL || null;
+  } catch (e) {
+    log('JSON parse failed, trying regex extraction');
+    
+    const patterns = [
+      /(?:sql|query)["']?\s*[:=]\s*["']?([^"'`;]+)/i,
+      /SELECT\s+[^;]+/i,
+      /"sql"\s*:\s*"([^"]+)"/i,
+      /'sql'\s*:\s*'([^']+)'/i,
+    ];
+    
+    for (const pattern of patterns) {
+      const match = response.match(pattern);
+      if (match) {
+        const sql = match[1] || match[0];
+        if (sql.toUpperCase().includes('SELECT')) {
+          log('Found SQL via regex:', sql.substring(0, 100));
+          return sql.trim();
+        }
+      }
+    }
     
     return null;
   }
@@ -69,6 +89,57 @@ function parseQueryIntent(sql: string): { table: string; filters: Record<string,
   }
   
   return { table, filters, fields };
+}
+
+function buildQueryFromKeywords(message: string): string | null {
+  const msg = message.toLowerCase();
+  
+  if (msg.includes('고객') || msg.includes('고객') && msg.includes('조회')) {
+    if (msg.includes('리스트') || msg.includes('목록')) {
+      return 'SELECT * FROM customers WHERE is_active = true ORDER BY created_at DESC LIMIT 20';
+    }
+    const nameMatch = message.match(/([가-힣]{2,4})동|([가-힣]{2,4})님|([가-힣]{2,4})氏/);
+    if (nameMatch) {
+      const name = nameMatch[1] || nameMatch[2] || nameMatch[3];
+      return `SELECT * FROM customers WHERE name LIKE '%${name}%' LIMIT 10`;
+    }
+    return 'SELECT * FROM customers WHERE is_active = true ORDER BY created_at DESC LIMIT 20';
+  }
+  
+  if (msg.includes('적립률') || msg.includes('적립율')) {
+    return 'SELECT * FROM customer_grades ORDER BY sort_order';
+  }
+  
+  if (msg.includes('포인트') || msg.includes('적립금')) {
+    const nameMatch = message.match(/([가-힣]{2,4})동|([가-힣]{2,4})님/);
+    if (nameMatch) {
+      const name = nameMatch[1] || nameMatch[2];
+      return `SELECT ph.*, c.name as customer_name FROM point_history ph JOIN customers c ON ph.customer_id = c.id WHERE c.name LIKE '%${name}%' ORDER BY ph.created_at DESC LIMIT 10`;
+    }
+    return null;
+  }
+  
+  if (msg.includes('제품') || msg.includes('상품')) {
+    const nameMatch = message.match(/([가-힣]+)/);
+    if (nameMatch) {
+      return `SELECT * FROM products WHERE name LIKE '%${nameMatch[1]}%' AND is_active = true LIMIT 20`;
+    }
+    return 'SELECT * FROM products WHERE is_active = true ORDER BY name LIMIT 20';
+  }
+  
+  if (msg.includes('지점')) {
+    return 'SELECT * FROM branches WHERE is_active = true ORDER BY name';
+  }
+  
+  if (msg.includes('재고')) {
+    return 'SELECT i.*, p.name as product_name, b.name as branch_name FROM inventories i JOIN products p ON i.product_id = p.id JOIN branches b ON i.branch_id = b.id LIMIT 20';
+  }
+  
+  if (msg.includes('매출') || msg.includes('주문') || msg.includes('판매')) {
+    return "SELECT * FROM sales_orders WHERE status = 'COMPLETED' ORDER BY ordered_at DESC LIMIT 20";
+  }
+  
+  return null;
 }
 
 async function executeSmartQuery(supabase: any, sql: string): Promise<{ data: any; error: any }> {
@@ -156,7 +227,16 @@ ${message}
     const sqlQuery = extractSqlFromResponse(response);
     
     if (!sqlQuery) {
-      log('Could not extract SQL from response');
+      log('Could not extract SQL, using keyword fallback');
+      const fallbackSql = buildQueryFromKeywords(message);
+      if (fallbackSql) {
+        const supabase = await createClient();
+        const { data, error } = await executeSmartQuery(supabase, fallbackSql);
+        if (error) {
+          return NextResponse.json({ type: 'error', message: `쿼리 실행 실패: ${error.message}` });
+        }
+        return NextResponse.json({ type: 'success', message: formatNaturalResponse(message, data) });
+      }
       return NextResponse.json({
         type: 'error',
         message: '질문을 이해하지 못했습니다. 다시 시도해주세요.',

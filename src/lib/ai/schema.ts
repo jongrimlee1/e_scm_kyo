@@ -133,33 +133,26 @@ processed_at: TIMESTAMP
 export const QUERY_EXAMPLES = `
 == 쿼리 예시 ==
 
-고객 전화번호로 조회:
-SELECT c.*, g.name as grade_name, g.point_rate, b.name as branch_name
-FROM customers c
-LEFT JOIN customer_grades g ON c.grade = g.code
-LEFT JOIN branches b ON c.primary_branch_id = b.id
-WHERE c.phone = '010-1234-5678'
+고객 이름으로 조회 (customers.name은 직접 조회):
+SELECT * FROM customers WHERE name LIKE '%홍길동%' LIMIT 10
 
-고객 등급별 적립률 조회:
+고객 등급별 적립률 (customer_grades 테이블):
 SELECT * FROM customer_grades ORDER BY sort_order
 
-지점별 재고 조회:
-SELECT i.*, p.name as product_name, b.name as branch_name
-FROM inventories i
-JOIN products p ON i.product_id = p.id
-JOIN branches b ON i.branch_id = b.id
-WHERE b.name LIKE '%강남%'
+포인트 잔액 조회 (point_history 테이블):
+SELECT * FROM point_history WHERE customer_id = '고객UUID' ORDER BY created_at DESC LIMIT 10
 
-포인트 잔액 조회:
-SELECT ph.*, c.name as customer_name
-FROM point_history ph
-JOIN customers c ON ph.customer_id = c.id
-WHERE c.name = '홍길동'
-ORDER BY ph.created_at DESC LIMIT 10
+제품 조회:
+SELECT * FROM products WHERE name LIKE '%제품명%' LIMIT 10
 
-오늘 매출 조회:
-SELECT * FROM sales_orders
-WHERE DATE(ordered_at) = CURRENT_DATE AND status = 'COMPLETED'
+지점 조회:
+SELECT * FROM branches WHERE name LIKE '%강남%' LIMIT 10
+
+재고 조회 (inventories 테이블):
+SELECT i.*, p.name as product_name FROM inventories i JOIN products p ON i.product_id = p.id WHERE i.quantity < i.safety_stock LIMIT 10
+
+매출 조회:
+SELECT * FROM sales_orders WHERE status = 'COMPLETED' ORDER BY ordered_at DESC LIMIT 10
 `;
 
 export const SYSTEM_PROMPT = `
@@ -169,28 +162,24 @@ export const SYSTEM_PROMPT = `
 1. 사용자의 자연어 질문을 이해
 2. 어떤 데이터를 원하는지 파악
 3. 적절한 SELECT 쿼리 생성
-4. 결과를 자연어로 설명
 
 == 절대 규칙 ==
 - INSERT, UPDATE, DELETE, DROP, TRUNCATE, ALTER 절대 금지
 - SELECT만 허용
-- 시스템 테이블이나 민감 정보 접근 금지
+- JOIN은 사용하지 마 (관계가 정의되지 않음)
+- 복잡한 서브쿼리 없이 간단한 쿼리 사용
 
-== 테이블 관계 ==
-- customers → customer_grades (grade 코드 조인)
-- customers → branches (primary_branch_id 조인)
-- inventories → products, branches (FK 조인)
-- inventory_movements → branches, products (FK 조인)
-- sales_orders → branches, customers, users (FK 조인)
-- sales_order_items → sales_orders, products (FK 조인)
-- point_history → customers, sales_orders (FK 조인)
+== 테이블 특징 ==
+- customers.grade: 직접 코드 저장 (NORMAL, VIP, VVIP)
+- customer_grades 테이블에서 등급명/적립률 조회 가능
+- inventories에 지점+제품组合으로 재고 있음
+- point_history에 고객별 포인트 내역 있음
 
 == 응답 형식 ==
-항상 JSON으로만 응답:
-{"sql":"SELECT ...", "description":"이 쿼리는 ~를 조회합니다"}
+반드시 이런 JSON으로만 응답:
+{"sql":"SELECT * FROM 테이블명 WHERE 조건 LIMIT 10"}
 
-쿼리 실행 후 결과를 받으면, 자연어로 사용자에게 설명하세요.
-예: "홍길동 고객은 현재 5,000P가 적립되어 있습니다."
+다른 텍스트 절대 추가하지 마.
 `;
 
 export const BUSINESS_RULES = `
