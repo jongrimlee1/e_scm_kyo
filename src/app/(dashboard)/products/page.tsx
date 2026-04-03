@@ -14,6 +14,7 @@ interface Product {
   cost: number | null;
   barcode: string | null;
   is_active: boolean;
+  is_taxable: boolean;
   category?: { id: string; name: string };
 }
 
@@ -103,6 +104,7 @@ export default function ProductsPage() {
               <th className="text-right">판매가</th>
               <th className="text-right">원가</th>
               <th className="text-right">마진율</th>
+              <th>부가세</th>
               <th>상태</th>
               <th></th>
             </tr>
@@ -111,7 +113,7 @@ export default function ProductsPage() {
             {loading ? (
               <tr><td colSpan={10} className="text-center text-slate-400 py-8">로딩 중...</td></tr>
             ) : filtered.length === 0 ? (
-              <tr><td colSpan={10} className="text-center text-slate-400 py-8">
+              <tr><td colSpan={11} className="text-center text-slate-400 py-8">
                 {search ? `"${search}" 검색 결과 없음` : '등록된 제품이 없습니다'}
               </td></tr>
             ) : filtered.map(product => {
@@ -133,6 +135,13 @@ export default function ProductsPage() {
                         {m}%
                       </span>
                     ) : <span className="text-slate-300">-</span>}
+                  </td>
+                  <td>
+                    <span className={product.is_taxable !== false
+                      ? 'badge bg-blue-100 text-blue-700'
+                      : 'badge bg-slate-100 text-slate-600'}>
+                      {product.is_taxable !== false ? '과세' : '면세'}
+                    </span>
                   </td>
                   <td>
                     <span className={product.is_active ? 'badge badge-success' : 'badge badge-error'}>

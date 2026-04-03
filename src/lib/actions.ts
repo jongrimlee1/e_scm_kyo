@@ -38,6 +38,7 @@ export async function createProduct(formData: FormData) {
     price: parseInt(formData.get('price') as string),
     cost: parseInt(formData.get('cost') as string) || null,
     barcode: formData.get('barcode') as string || null,
+    is_taxable: formData.get('is_taxable') !== 'false',
   };
 
   // @ts-ignore
@@ -82,6 +83,7 @@ export async function updateProduct(id: string, formData: FormData) {
     cost: parseInt(formData.get('cost') as string) || null,
     barcode: formData.get('barcode') as string || null,
     is_active: formData.get('is_active') === 'true',
+    is_taxable: formData.get('is_taxable') !== 'false',
   };
 
   // @ts-ignore

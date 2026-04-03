@@ -14,6 +14,7 @@ interface Product {
   cost: number | null;
   barcode: string | null;
   is_active: boolean;
+  is_taxable: boolean;
 }
 
 interface Props {
@@ -33,6 +34,7 @@ export default function ProductModal({ product, onClose, onSuccess }: Props) {
     cost: product?.cost || null,
     barcode: product?.barcode || null,
     is_active: product?.is_active ?? true,
+    is_taxable: product?.is_taxable ?? true,
   });
   const [error, setError] = useState('');
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
@@ -228,6 +230,37 @@ export default function ProductModal({ product, onClose, onSuccess }: Props) {
                 autoFocus={!product}
               />
             </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">부가세 구분 *</label>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setFormData({ ...formData, is_taxable: true })}
+                className={`flex-1 py-2 rounded-md text-sm font-medium border transition-colors ${
+                  formData.is_taxable
+                    ? 'bg-blue-600 text-white border-blue-600'
+                    : 'bg-white text-slate-600 border-slate-300 hover:bg-slate-50'
+                }`}
+              >
+                과세 (10%)
+              </button>
+              <button
+                type="button"
+                onClick={() => setFormData({ ...formData, is_taxable: false })}
+                className={`flex-1 py-2 rounded-md text-sm font-medium border transition-colors ${
+                  !formData.is_taxable
+                    ? 'bg-slate-700 text-white border-slate-700'
+                    : 'bg-white text-slate-600 border-slate-300 hover:bg-slate-50'
+                }`}
+              >
+                면세
+              </button>
+            </div>
+            <p className="mt-1 text-xs text-slate-400">
+              {formData.is_taxable ? '부가세 10% 적용 — 공급가액 = 판매가 ÷ 1.1' : '부가세 없음 — 한약류, 식품류 등 면세 품목'}
+            </p>
           </div>
 
           {product?.id && (

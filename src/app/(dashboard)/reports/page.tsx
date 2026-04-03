@@ -87,6 +87,25 @@ const REFUND_METHOD_LABELS: Record<string, string> = {
 
 type ReportTab = 'sales' | 'purchase' | 'pl' | 'trend' | 'margin';
 
+interface PaymentSales {
+  method: string;
+  label: string;
+  amount: number;
+  count: number;
+  percentage: number;
+}
+
+interface TaxSales {
+  taxableAmount: number;   // 과세 매출 (VAT 포함)
+  taxableSupply: number;   // 과세 공급가액 (÷1.1)
+  vatAmount: number;       // 부가세액
+  exemptAmount: number;    // 면세 매출
+}
+
+const PAYMENT_LABELS_KO: Record<string, string> = {
+  cash: '현금', card: '카드', kakao: '카카오페이', point: '포인트', mixed: '복합결제',
+};
+
 export default function ReportsPage() {
   const [reportTab, setReportTab] = useState<ReportTab>('sales');
   const [period, setPeriod] = useState<'daily' | 'weekly' | 'monthly'>('daily');
@@ -114,6 +133,8 @@ export default function ReportsPage() {
   const [branchSales, setBranchSales] = useState<BranchSales[]>([]);
   const [productSales, setProductSales] = useState<ProductSales[]>([]);
   const [rawOrders, setRawOrders] = useState<any[]>([]);
+  const [paymentSales, setPaymentSales] = useState<PaymentSales[]>([]);
+  const [taxSales, setTaxSales] = useState<TaxSales>({ taxableAmount: 0, taxableSupply: 0, vatAmount: 0, exemptAmount: 0 });
   const [purchaseData, setPurchaseData]   = useState<any[]>([]);
   const [returnData, setReturnData]       = useState<any[]>([]);
   const [trendData, setTrendData]         = useState<any[]>([]);
@@ -155,6 +176,7 @@ export default function ReportsPage() {
         points_used,
         channel,
         branch_id,
+        payment_method,
         branch:branches(name),
         ordered_at
       `)
@@ -167,8 +189,9 @@ export default function ReportsPage() {
     let { data: orderItems } = await supabase
       .from('sales_order_items')
       .select(`
+        order_id,
         product_id,
-        product:products(name),
+        product:products(name, is_taxable),
         quantity,
         total_price,
         created_at
@@ -199,6 +222,46 @@ export default function ReportsPage() {
     }
 
     setRawOrders(ordersData);
+
+    // ── 결제수단별 집계
+    const filteredOrderIds = new Set(ordersData.map((o: any) => o.id));
+    const paymentMap = new Map<string, { amount: number; count: number }>();
+    ordersData.forEach((o: any) => {
+      const method = o.payment_method || 'cash';
+      const e = paymentMap.get(method) || { amount: 0, count: 0 };
+      paymentMap.set(method, { amount: e.amount + (o.total_amount || 0), count: e.count + 1 });
+    });
+    const totalAmountForPayment = ordersData.reduce((s: number, o: any) => s + (o.total_amount || 0), 0);
+    const paymentArr: PaymentSales[] = [];
+    paymentMap.forEach((v, method) => {
+      paymentArr.push({
+        method,
+        label: PAYMENT_LABELS_KO[method] || method,
+        amount: v.amount,
+        count: v.count,
+        percentage: totalAmountForPayment > 0 ? Math.round((v.amount / totalAmountForPayment) * 100) : 0,
+      });
+    });
+    setPaymentSales(paymentArr.sort((a, b) => b.amount - a.amount));
+
+    // ── 과세/면세 집계 (필터된 주문에 속한 항목만)
+    const filteredItems = (orderItems || []).filter((item: any) => filteredOrderIds.has(item.order_id));
+    let taxableAmt = 0;
+    let exemptAmt = 0;
+    filteredItems.forEach((item: any) => {
+      if ((item.product as any)?.is_taxable !== false) {
+        taxableAmt += item.total_price || 0;
+      } else {
+        exemptAmt += item.total_price || 0;
+      }
+    });
+    const vatAmt = Math.round(taxableAmt * 10 / 110);
+    setTaxSales({
+      taxableAmount: taxableAmt,
+      taxableSupply: taxableAmt - vatAmt,
+      vatAmount: vatAmt,
+      exemptAmount: exemptAmt,
+    });
 
     const totalAmount = ordersData.reduce((sum, o) => sum + (o.total_amount || 0), 0);
     const totalDiscount = ordersData.reduce((sum, o) => sum + (o.discount_amount || 0), 0);
@@ -317,6 +380,70 @@ export default function ReportsPage() {
     }
     setStartDate(start.toISOString().slice(0, 10));
     setEndDate(end.toISOString().slice(0, 10));
+  };
+
+  const exportCSV = (filename: string, headers: string[], rows: (string | number)[]) => {
+    const BOM = '\uFEFF'; // Excel 한글 깨짐 방지
+    const lines = [headers, ...(rows as any[])].map((row: any[]) =>
+      row.map((cell: any) => `"${String(cell ?? '').replace(/"/g, '""')}"`).join(',')
+    );
+    const csv = BOM + lines.join('\r\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const exportSalesCSV = () => {
+    const date = new Date().toISOString().slice(0, 10);
+    exportCSV(
+      `매출내역_${startDate}_${endDate}.csv`,
+      ['주문일시', '지점', '채널', '결제수단', '매출액', '할인액', '순매출', '적립포인트', '사용포인트'],
+      rawOrders.map((o: any) => [
+        o.ordered_at?.slice(0, 16).replace('T', ' ') || '',
+        o.branchName || '',
+        CHANNEL_NAMES[o.channel] || o.channel || '',
+        PAYMENT_LABELS_KO[o.payment_method] || o.payment_method || '',
+        o.total_amount || 0,
+        o.discount_amount || 0,
+        (o.total_amount || 0) - (o.discount_amount || 0),
+        o.points_earned || 0,
+        o.points_used || 0,
+      ]) as any
+    );
+  };
+
+  const exportPurchaseCSV = () => {
+    exportCSV(
+      `매입내역_${startDate}_${endDate}.csv`,
+      ['발주일', '발주번호', '공급업체', '입고지점', '상태', '발주금액'],
+      purchaseData.map((p: any) => [
+        p.ordered_at?.slice(0, 10) || '',
+        p.po_number || '',
+        (p.supplier as any)?.name || '',
+        (p.branch as any)?.name || '',
+        PO_STATUS_LABELS[p.status] || p.status || '',
+        p.total_amount || 0,
+      ]) as any
+    );
+  };
+
+  const exportReturnCSV = () => {
+    exportCSV(
+      `환불내역_${startDate}_${endDate}.csv`,
+      ['처리일', '환불번호', '사유', '방법', '지점', '환불금액'],
+      returnData.map((r: any) => [
+        r.processed_at?.slice(0, 10) || '',
+        r.return_number || '',
+        RETURN_REASON_LABELS[r.reason] || r.reason || '',
+        REFUND_METHOD_LABELS[r.refund_method] || r.refund_method || '',
+        (r.branch as any)?.name || '',
+        r.refund_amount || 0,
+      ]) as any
+    );
   };
 
   const downloadPDF = () => {
@@ -538,8 +665,23 @@ export default function ReportsPage() {
           <button onClick={fetchReportData} className="btn-secondary">
             조회
           </button>
+          {reportTab === 'sales' && rawOrders.length > 0 && (
+            <button onClick={exportSalesCSV} className="btn-secondary">
+              매출 CSV
+            </button>
+          )}
+          {reportTab === 'purchase' && purchaseData.length > 0 && (
+            <button onClick={exportPurchaseCSV} className="btn-secondary">
+              매입 CSV
+            </button>
+          )}
+          {reportTab === 'purchase' && returnData.length > 0 && (
+            <button onClick={exportReturnCSV} className="btn-secondary">
+              환불 CSV
+            </button>
+          )}
           <button onClick={downloadPDF} className="btn-primary">
-            PDF 다운로드
+            PDF
           </button>
         </div>
       </div>
@@ -752,6 +894,65 @@ export default function ReportsPage() {
                       </div>
                     </div>
                   ))}
+                </div>
+              ) : (
+                <p className="text-center text-slate-400 py-8">데이터가 없습니다</p>
+              )}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div className="card">
+              <h3 className="font-semibold mb-4">결제수단별 매출</h3>
+              {paymentSales.length > 0 ? (
+                <div className="space-y-3">
+                  {paymentSales.map((pm) => (
+                    <div key={pm.method}>
+                      <div className="flex justify-between items-center mb-1">
+                        <span className="text-slate-600">{pm.label}</span>
+                        <span className="font-semibold">
+                          {pm.amount.toLocaleString()}원
+                          <span className="text-slate-400 text-xs ml-1">({pm.count}건, {pm.percentage}%)</span>
+                        </span>
+                      </div>
+                      <div className="w-full bg-slate-100 rounded-full h-2">
+                        <div className="bg-amber-500 h-2 rounded-full" style={{ width: `${pm.percentage}%` }} />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-center text-slate-400 py-8">데이터가 없습니다</p>
+              )}
+            </div>
+
+            <div className="card">
+              <h3 className="font-semibold mb-4">과세/면세 매출 구분
+                <span className="text-xs text-slate-400 font-normal ml-2">(부가세 포함가 기준)</span>
+              </h3>
+              {(taxSales.taxableAmount + taxSales.exemptAmount) > 0 ? (
+                <div className="space-y-3 text-sm">
+                  <div className="flex justify-between py-2 border-b border-slate-100">
+                    <span className="text-slate-500">과세 매출 (VAT포함)</span>
+                    <span className="font-semibold">{taxSales.taxableAmount.toLocaleString()}원</span>
+                  </div>
+                  <div className="flex justify-between py-1 pl-3">
+                    <span className="text-slate-400">ㄴ 공급가액</span>
+                    <span>{taxSales.taxableSupply.toLocaleString()}원</span>
+                  </div>
+                  <div className="flex justify-between py-1 pl-3 border-b border-slate-100">
+                    <span className="text-slate-400">ㄴ 부가세액</span>
+                    <span className="text-blue-600">{taxSales.vatAmount.toLocaleString()}원</span>
+                  </div>
+                  <div className="flex justify-between py-2 border-b border-slate-100">
+                    <span className="text-slate-500">면세 매출</span>
+                    <span className="font-semibold">{taxSales.exemptAmount.toLocaleString()}원</span>
+                  </div>
+                  <div className="flex justify-between py-2 bg-slate-50 px-3 rounded-lg">
+                    <span className="font-semibold">합계</span>
+                    <span className="font-bold">{(taxSales.taxableAmount + taxSales.exemptAmount).toLocaleString()}원</span>
+                  </div>
+                  <p className="text-xs text-slate-400 mt-1">* 공급가액 = 과세매출 ÷ 1.1, 부가세 = 과세매출 × 10/110</p>
                 </div>
               ) : (
                 <p className="text-center text-slate-400 py-8">데이터가 없습니다</p>
