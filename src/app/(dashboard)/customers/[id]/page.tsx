@@ -133,8 +133,13 @@ export default function CustomerDetailPage() {
         .from('sales_orders')
         .select(`
           id,
+          order_number,
           ordered_at,
           status,
+          total_amount,
+          payment_method,
+          points_earned,
+          points_used,
           branch_id,
           branch:branches(name, id),
           items:sales_order_items(
@@ -543,9 +548,14 @@ export default function CustomerDetailPage() {
                             <span className={`badge text-xs ${statusColor[order.status] || ''}`}>
                               {statusLabel[order.status] || order.status}
                             </span>
-                            <span className={`font-semibold text-sm ${isRefunded || isCancelled ? 'line-through text-slate-400' : ''}`}>
-                              {(order.total_amount || 0).toLocaleString()}원
-                            </span>
+                            <div className="text-right">
+                              <p className={`font-semibold text-sm ${isRefunded || isCancelled ? 'line-through text-slate-400' : ''}`}>
+                                {(order.total_amount || 0).toLocaleString()}원
+                              </p>
+                              {order.points_earned > 0 && (
+                                <p className="text-xs text-blue-500">+{order.points_earned.toLocaleString()}P 적립</p>
+                              )}
+                            </div>
                           </div>
                         </button>
                         {isExpanded && (
@@ -570,9 +580,17 @@ export default function CustomerDetailPage() {
                                 ))}
                               </tbody>
                             </table>
-                            {order.payment_method && (
-                              <p className="text-xs text-slate-400 mt-2">결제: {PAYMENT_LABELS[order.payment_method] || order.payment_method}</p>
-                            )}
+                            <div className="flex flex-wrap gap-3 mt-2 text-xs text-slate-500">
+                              {order.payment_method && (
+                                <span>결제: {PAYMENT_LABELS[order.payment_method] || order.payment_method}</span>
+                              )}
+                              {order.points_used > 0 && (
+                                <span className="text-amber-600">포인트 사용: -{order.points_used.toLocaleString()}P</span>
+                              )}
+                              {order.points_earned > 0 && (
+                                <span className="text-blue-600">포인트 적립: +{order.points_earned.toLocaleString()}P</span>
+                              )}
+                            </div>
                           </div>
                         )}
                       </div>

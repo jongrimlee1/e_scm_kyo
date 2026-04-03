@@ -53,7 +53,32 @@ export default function CustomersPage() {
     }
 
     const { data } = await query;
-    setCustomers(data || []);
+    const customers = data || [];
+
+    // customers 테이블에 total_points 컬럼 없음 → point_history 최신 balance 조회
+    if (customers.length > 0) {
+      const ids = customers.map((c: any) => c.id);
+      const { data: pointRows } = await supabase
+        .from('point_history')
+        .select('customer_id, balance')
+        .in('customer_id', ids)
+        .order('created_at', { ascending: false });
+
+      // 고객별 가장 최근 balance (DESC 정렬이므로 첫 번째가 최신)
+      const balanceMap: Record<string, number> = {};
+      for (const row of (pointRows || []) as any[]) {
+        if (!(row.customer_id in balanceMap)) {
+          balanceMap[row.customer_id] = row.balance;
+        }
+      }
+      setCustomers(customers.map((c: any) => ({
+        ...c,
+        total_points: balanceMap[c.id] ?? 0,
+      })));
+    } else {
+      setCustomers([]);
+    }
+
     setLoading(false);
   };
 
