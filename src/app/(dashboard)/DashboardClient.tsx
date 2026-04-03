@@ -66,6 +66,14 @@ const CHANNEL_COLORS: Record<string, string> = {
   EVENT: 'bg-amber-500',
 };
 
+const ORDER_STATUS_LABELS: Record<string, string> = {
+  COMPLETED: '완료',
+  CANCELLED: '취소',
+  REFUNDED: '환불',
+  PARTIALLY_REFUNDED: '부분환불',
+  PENDING: '대기',
+};
+
 function getCookie(name: string): string | null {
   if (typeof document === 'undefined') return null;
   const cookies = document.cookie.split(';').reduce((acc, cookie) => {
@@ -322,9 +330,10 @@ export default function DashboardClient() {
                     <p className={`text-xs ${
                       order.status === 'COMPLETED' ? 'text-green-600' :
                       order.status === 'CANCELLED' ? 'text-red-600' :
+                      order.status === 'REFUNDED' ? 'text-red-500' :
                       'text-slate-500'
                     }`}>
-                      {order.status}
+                      {ORDER_STATUS_LABELS[order.status] || order.status}
                     </p>
                   </div>
                 </div>

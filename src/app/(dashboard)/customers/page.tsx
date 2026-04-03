@@ -6,6 +6,13 @@ import { createClient } from '@/lib/supabase/client';
 import CustomerModal from './CustomerModal';
 import { autoUpgradeCustomerGrades } from '@/lib/actions';
 
+const GRADE_LABELS: Record<string, string> = { VVIP: 'VVIP', VIP: 'VIP', NORMAL: '일반' };
+const GRADE_BADGE: Record<string, string> = {
+  VVIP: 'badge badge-warning',
+  VIP: 'badge badge-info',
+  NORMAL: 'badge',
+};
+
 interface Customer {
   id: string;
   name: string;
@@ -141,11 +148,8 @@ export default function CustomersPage() {
               <td className="font-medium">{customer.name}</td>
               <td>{customer.phone}</td>
               <td>
-                <span className={`badge ${
-                  customer.grade === 'VVIP' ? 'badge-warning' :
-                  customer.grade === 'VIP' ? 'badge-info' : ''
-                }`}>
-                  {customer.grade}
+                <span className={GRADE_BADGE[customer.grade] || 'badge'}>
+                  {GRADE_LABELS[customer.grade] || customer.grade}
                 </span>
               </td>
               <td>{customer.primary_branch?.name || '-'}</td>

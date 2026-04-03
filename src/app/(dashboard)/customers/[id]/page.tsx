@@ -70,6 +70,10 @@ const GRADE_LABELS: Record<string, string> = {
   VVIP: 'VVIP',
 };
 
+const PAYMENT_LABELS: Record<string, string> = {
+  cash: '현금', card: '카드', kakao: '카카오페이',
+};
+
 function formatDate(date: Date): string {
   return date.toISOString().slice(0, 10);
 }
@@ -567,7 +571,7 @@ export default function CustomerDetailPage() {
                               </tbody>
                             </table>
                             {order.payment_method && (
-                              <p className="text-xs text-slate-400 mt-2">결제: {order.payment_method}</p>
+                              <p className="text-xs text-slate-400 mt-2">결제: {PAYMENT_LABELS[order.payment_method] || order.payment_method}</p>
                             )}
                           </div>
                         )}
@@ -651,7 +655,7 @@ export default function CustomerDetailPage() {
             <div className="card">
               <h3 className="font-semibold mb-4">추가 정보</h3>
               <p className="text-slate-500 text-sm">
-                기본 정보 수정은 목록에서 "수정" 버튼을利用してください。
+                기본 정보 수정은 고객 목록의 "수정" 버튼을 이용하세요.
               </p>
             </div>
           )}

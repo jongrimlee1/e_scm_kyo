@@ -15,6 +15,9 @@ function getCookie(name: string): string | null {
   return cookies[name] || null;
 }
 
+const GRADE_LABELS: Record<string, string> = { VVIP: 'VVIP', VIP: 'VIP', NORMAL: '일반' };
+const PAYMENT_LABELS: Record<string, string> = { cash: '현금', card: '카드', kakao: '카카오페이' };
+
 interface CartItem {
   productId: string;
   name: string;
@@ -281,7 +284,7 @@ export default function POSPage() {
 
         const inv = inventory as any;
         if (!inv || inv.quantity < item.quantity) {
-          // 재고 부족 -刚才创建的销售记录需要删除
+          // 재고 부족 - 방금 생성한 판매 전표 삭제
           await db.from('sales_orders').delete().eq('id', saleOrderId);
           alert(`"${item.name}" 재고가 부족합니다. 결제가 취소되었습니다.`);
           setProcessing(false);
@@ -379,7 +382,7 @@ export default function POSPage() {
       setPointsToUse(0);
     } catch (err: any) {
       console.error('결제 오류:', err);
-      // 에러 발생 시刚才创建的销售记录也删除
+      // 에러 발생 시 방금 생성한 판매 전표도 삭제
       if (saleOrderId) {
         try {
           await db.from('sales_orders').delete().eq('id', saleOrderId);
@@ -422,7 +425,7 @@ export default function POSPage() {
             <input
               ref={barcodeInputRef}
               type="text"
-              placeholder="📷 바코드 리더기:条码扫描器 (Enter 자동 인식)"
+              placeholder="📷 바코드 리더 (Enter 자동 인식)"
               className="input text-sm border-2 border-blue-200 focus:border-blue-400"
               onKeyDown={(e) => {
                 if (e.key === 'Enter') {
@@ -556,7 +559,7 @@ export default function POSPage() {
                       selectedCustomer.grade === 'VIP' ? 'bg-amber-100 text-amber-700' :
                       'bg-slate-100 text-slate-600'
                     }`}>
-                      {selectedCustomer.grade}
+                      {GRADE_LABELS[selectedCustomer.grade] || selectedCustomer.grade}
                     </span>
                     <span className="text-xs text-green-600 font-medium">
                       {selectedCustomer.currentPoints?.toLocaleString() || 0}P
@@ -631,7 +634,7 @@ export default function POSPage() {
                             c.grade === 'VIP' ? 'bg-amber-100 text-amber-700' :
                             'bg-slate-100 text-slate-600'
                           }`}>
-                            {c.grade}
+                            {GRADE_LABELS[c.grade] || c.grade}
                           </span>
                         </div>
                       </button>

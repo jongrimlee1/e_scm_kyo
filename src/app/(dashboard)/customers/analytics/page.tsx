@@ -17,6 +17,7 @@ function getCookie(name: string): string | null {
   }, {} as Record<string, string>)[name] || null;
 }
 
+const GRADE_LABELS: Record<string, string> = { VVIP: 'VVIP', VIP: 'VIP', NORMAL: '일반' };
 const GRADE_BADGE: Record<string, string> = {
   VVIP:   'bg-red-100 text-red-700',
   VIP:    'bg-amber-100 text-amber-700',
@@ -186,7 +187,7 @@ export default function CustomerAnalyticsPage() {
                           <Link href={`/customers/${c.id}`} className="font-medium text-blue-600 hover:underline">{c.name}</Link>
                         </td>
                         <td className="font-mono text-xs">{c.phone}</td>
-                        <td><span className={`px-1.5 py-0.5 rounded text-xs font-medium ${GRADE_BADGE[c.grade] || ''}`}>{c.grade}</span></td>
+                        <td><span className={`px-1.5 py-0.5 rounded text-xs font-medium ${GRADE_BADGE[c.grade] || ''}`}>{GRADE_LABELS[c.grade] || c.grade}</span></td>
                         <td className="text-center">
                           <RfmDot score={c.r} />
                         </td>
@@ -325,7 +326,7 @@ export default function CustomerAnalyticsPage() {
                           <Link href={`/customers/${c.customerId}`} className="font-medium text-blue-600 hover:underline">{c.name}</Link>
                         </td>
                         <td className="font-mono text-xs">{c.phone}</td>
-                        <td><span className={`px-1.5 py-0.5 rounded text-xs font-medium ${GRADE_BADGE[c.grade] || ''}`}>{c.grade}</span></td>
+                        <td><span className={`px-1.5 py-0.5 rounded text-xs font-medium ${GRADE_BADGE[c.grade] || ''}`}>{GRADE_LABELS[c.grade] || c.grade}</span></td>
                         <td className="text-right text-slate-500">{c.lastDate?.slice(0, 10)}</td>
                         <td className="text-right">
                           <span className={`font-semibold ${c.daysSinceLast >= 180 ? 'text-red-600' : c.daysSinceLast >= 90 ? 'text-amber-600' : 'text-slate-700'}`}>
