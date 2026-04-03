@@ -16,6 +16,43 @@ function log(msg: string, data?: any) {
   console.log(`[Agent] ${msg}`, data || '');
 }
 
+function parseNaturalLanguageIntent(userMessage: string, aiResponse: string): any {
+  const combined = (userMessage + ' ' + aiResponse).toLowerCase();
+  
+  if (combined.includes('고객') && (combined.includes('조회') || combined.includes('검색') || combined.includes('정보'))) {
+    const nameMatch = userMessage.match(/(?:홍길동|[가-힣]+동|([가-힣]{2,4}))(?: 고객)?/);
+    const searchName = nameMatch && nameMatch[1] ? nameMatch[1] : 
+                       userMessage.includes('홍길동') ? '홍길동' : null;
+    if (userMessage.includes('리스트') || userMessage.includes('목록')) {
+      return { operation: 'customer_query', data: {} };
+    }
+    return { operation: 'customer_query', data: { search: searchName } };
+  }
+  
+  if (combined.includes('재고') && combined.includes('이동')) {
+    return { operation: 'inventory_transfer', data: {} };
+  }
+  
+  if (combined.includes('재고') && (combined.includes('조회') || combined.includes('확인'))) {
+    return { operation: 'product_query', data: {} };
+  }
+  
+  if (combined.includes('포인트') && combined.includes('조회')) {
+    return { operation: 'point_query', data: {} };
+  }
+  
+  if (combined.includes('무엇') || combined.includes('뭐') || combined.includes('도움')) {
+    return { 
+      operation: 'info', 
+      data: { 
+        message: 'AI 어시스턴트가 도와드릴 수 있습니다: 고객 조회, 재고 이동/조정, 포인트 적립/사용, 제품 검색 등'
+      } 
+    };
+  }
+  
+  return null;
+}
+
 export async function POST(req: NextRequest) {
   try {
     log('Request received');
@@ -47,12 +84,15 @@ export async function POST(req: NextRequest) {
     try {
       intent = JSON.parse(cleaned);
     } catch (e: any) {
-      log('JSON parse error', e.message);
-      return NextResponse.json({
-        type: 'error',
-        message: '명령을 이해하지 못했습니다.',
-        raw: response,
-      });
+      log('JSON parse error, trying fallback parser', e.message);
+      intent = parseNaturalLanguageIntent(message, cleaned);
+      if (!intent) {
+        return NextResponse.json({
+          type: 'error',
+          message: '명령을 이해하지 못했습니다.',
+          raw: response,
+        });
+      }
     }
 
     log('Parsed intent', intent);
@@ -330,6 +370,33 @@ async function executeOperation(supabase: any, operation: string, data: Record<s
       return {
         message: `${branches?.length || 0}개 지점 조회됨`,
         data: branches,
+      };
+    }
+
+    case 'info': {
+      return {
+        message: data?.message || 'AI 어시스턴트가 도와드릴 수 있습니다: 고객 조회/검색, 재고 이동/조정, 포인트 적립/사용, 제품 검색, 지점 조회 등',
+        data: data || {},
+      };
+    }
+
+    case 'point_query': {
+      const { customerId, search } = data;
+      if (customerId) {
+        const { data: history } = await supabase
+          .from('point_history')
+          .select('*')
+          .eq('customer_id', customerId)
+          .order('created_at', { ascending: false })
+          .limit(10);
+        return {
+          message: `포인트 조회 완료`,
+          data: history,
+        };
+      }
+      return {
+        message: `고객 전화번호나 이름을 알려주세요`,
+        data: {},
       };
     }
 
