@@ -83,7 +83,7 @@ async function executeSmartQuery(supabase: any, sql: string): Promise<{ data: an
   }
   
   try {
-    let query = (supabase as any).from(table).select(fields.join(','));
+    let query = (supabase as any).from(table).select('*');
     
     for (const [field, cond] of Object.entries(filters)) {
       const condition = cond as { op: string; value: string };
@@ -104,14 +104,6 @@ async function executeSmartQuery(supabase: any, sql: string): Promise<{ data: an
       query = query.limit(parseInt(limitMatch[1]));
     } else {
       query = query.limit(20);
-    }
-    
-    if (table === 'customers') {
-      query = query.select('*, customer_grades(name, point_rate), branches(name)');
-    } else if (table === 'inventories') {
-      query = query.select('*, products(name, code), branches(name)');
-    } else if (table === 'point_history') {
-      query = query.select('*, customers(name, phone)');
     }
     
     const { data, error } = await query;
@@ -231,13 +223,13 @@ function formatSingleRecord(record: any, question: string): string {
   
   const keys = Object.keys(record);
   
-  if (keys.includes('name') && keys.includes('phone')) {
+  if (keys.includes('name') && keys.includes('phone') && keys.includes('grade')) {
     let msg = '';
     if (record.name) msg += `${record.name}`;
     if (record.phone) msg += ` (전화번호: ${record.phone})`;
     if (record.grade) {
-      const gradeName = record.grade_name || record.grade;
-      msg += `, 등급: ${gradeName}`;
+      const gradeNames: Record<string, string> = { NORMAL: '일반', VIP: 'VIP', VVIP: 'VVIP' };
+      msg += `, 등급: ${gradeNames[record.grade] || record.grade}`;
     }
     if (record.point_rate) msg += `, 적립률: ${record.point_rate}%`;
     if (record.balance !== undefined && record.balance !== null) {
@@ -257,6 +249,11 @@ function formatSingleRecord(record: any, question: string): string {
     if (record.created_at) {
       const date = new Date(record.created_at);
       msg += `, 등록일: ${date.toLocaleDateString('ko-KR')}`;
+    }
+    if (record.source) msg += `, 출처: ${record.source}`;
+    if (record.channel) {
+      const channelNames: Record<string, string> = { STORE: '한약국', DEPT_STORE: '백화점', ONLINE: '자사몰', EVENT: '이벤트' };
+      msg += `, 채널: ${channelNames[record.channel] || record.channel}`;
     }
     return msg || JSON.stringify(record);
   }
@@ -299,9 +296,10 @@ function formatMultipleRecords(records: any[], question: string): string {
   
   const isCustomerList = records[0] && 'name' in records[0] && 'phone' in records[0];
   if (isCustomerList) {
+    const gradeNames: Record<string, string> = { NORMAL: '일반', VIP: 'VIP', VVIP: 'VVIP' };
     const list = records.slice(0, 10).map((c: any, i: number) => {
       let line = `${i + 1}. ${c.name} (${c.phone || '전화번호 없음'})`;
-      if (c.grade) line += ` - ${c.grade}`;
+      if (c.grade) line += ` - ${gradeNames[c.grade] || c.grade}`;
       if (c.balance !== undefined && c.balance !== null) line += ` - ${Number(c.balance).toLocaleString()}P`;
       return line;
     }).join('\n');
@@ -330,7 +328,8 @@ function formatMultipleRecords(records: any[], question: string): string {
   
   const isGradeList = records[0] && 'point_rate' in records[0];
   if (isGradeList) {
-    return records.map(g => `${g.name || g.code}: 적립률 ${g.point_rate}%`).join('\n');
+    const gradeNames: Record<string, string> = { NORMAL: '일반', VIP: 'VIP', VVIP: 'VVIP' };
+    return records.map(g => `${gradeNames[g.code] || g.name || g.code}: 적립률 ${g.point_rate}%`).join('\n');
   }
   
   const isPointHistory = records[0] && 'balance' in records[0];
