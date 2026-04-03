@@ -29,7 +29,7 @@ export async function POST(req: NextRequest) {
 
     log('Message received', message);
 
-    const fullPrompt = `${SYSTEM_PROMPT}\n\n${DB_SCHEMA}\n\n${BUSINESS_RULES}\n\n== 현재 사용자 context ==\n${context?.userId ? `사용자 ID: ${context.userId}` : ''}\n${context?.userRole ? `역할: ${context.userRole}` : ''}\n${context?.branchId ? `지점 ID: ${context.branchId}` : ''}\n\n== 사용자 명령 ==\n${message}\n\n위 명령을 해석하여 JSON 형식으로만 응답하세요. operation 가능한 값:\n- inventory_transfer (재고 이동)\n- inventory_adjust (재고 조정)\n- inventory_in (재고 입고)\n- inventory_out (재고 출고)\n- point_earn (포인트 적립)\n- point_use (포인트 사용)\n- point_query (포인트 조회)\n- customer_query (고객 조회)\n- customer_create (고객 등록)\n- order_query (주문 조회)\n- product_query (제품 조회)\n- info (일반 정보 조회)\n\n응답은 JSON 하나만, 설명 추가 금지.`;
+    const fullPrompt = `${SYSTEM_PROMPT}\n\n${DB_SCHEMA}\n\n${BUSINESS_RULES}\n\n== 현재 사용자 context ==\n${context?.userId ? `사용자 ID: ${context.userId}` : ''}\n${context?.userRole ? `역할: ${context.userRole}` : ''}\n${context?.branchId ? `지점 ID: ${context.branchId}` : ''}\n\n== 사용자 명령 ==\n${message}\n\n## 중요: 반드시 JSON으로만 응답하세요\n아래 예시처럼 JSON 객체 하나만 출력하세요. 다른 텍스트를 절대 추가하지 마세요.\n\n예시:\n{"operation":"customer_query","data":{"search":"홍길동"}}\n{"operation":"info","message":"현재 재고는 100개입니다"}\n\noperation 가능한 값:\n- inventory_transfer (재고 이동)\n- inventory_adjust (재고 조정)\n- inventory_in (재고 입고)\n- inventory_out (재고 출고)\n- point_earn (포인트 적립)\n- point_use (포인트 사용)\n- point_query (포인트 조회)\n- customer_query (고객 조회)\n- customer_create (고객 등록)\n- order_query (주문 조회)\n- product_query (제품 조회)\n- branch_query (지점 조회)\n- info (일반 정보 조회)\n\n**JSON만 응답하세요. 설명이나 다른 텍스트 없이.**`;
 
     const messages: MiniMaxMessage[] = [
       { role: 'system', content: fullPrompt },
