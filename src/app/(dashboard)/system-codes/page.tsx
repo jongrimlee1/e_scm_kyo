@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import {
   createBranch, updateBranch, deleteBranch,
@@ -52,6 +52,7 @@ interface CustomerGrade {
   sort_order: number;
   is_active: boolean;
   point_rate: number;
+  upgrade_threshold: number | null;
 }
 
 interface CustomerTag {
@@ -507,6 +508,7 @@ export default function SystemCodesPage() {
                 <th>색상</th>
                 <th>순서</th>
                 <th>적립율</th>
+                <th>업그레이드 기준</th>
                 <th>상태</th>
                 <th>관리</th>
               </tr>
@@ -533,6 +535,11 @@ export default function SystemCodesPage() {
                   </td>
                   <td>{grade.sort_order}</td>
                   <td>{grade.point_rate}%</td>
+                  <td className="text-sm">
+                    {grade.upgrade_threshold != null
+                      ? `${grade.upgrade_threshold.toLocaleString()}원↑`
+                      : <span className="text-slate-400">-</span>}
+                  </td>
                   <td>
                     <span className={`badge ${grade.is_active ? 'badge-success' : 'badge-error'}`}>
                       {grade.is_active ? '활성' : '비활성'}
@@ -1216,6 +1223,7 @@ function GradeModal({ grade, onClose, onSuccess }: { grade: CustomerGrade | null
     sort_order: grade?.sort_order || 0,
     is_active: grade?.is_active ?? true,
     point_rate: grade?.point_rate || 1.00,
+    upgrade_threshold: grade?.upgrade_threshold ?? '',
   });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -1350,6 +1358,20 @@ function GradeModal({ grade, onClose, onSuccess }: { grade: CustomerGrade | null
               className="mt-1 input"
               placeholder="1.00"
             />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700">자동 업그레이드 기준 누적 구매액 (원)</label>
+            <input
+              type="number"
+              min="0"
+              step="10000"
+              value={formData.upgrade_threshold}
+              onChange={(e) => setFormData({ ...formData, upgrade_threshold: e.target.value })}
+              className="mt-1 input"
+              placeholder="미설정 시 자동 업그레이드 없음"
+            />
+            <p className="mt-1 text-xs text-slate-400">비워두면 자동 업그레이드 대상에서 제외됩니다 (예: 일반 등급)</p>
           </div>
 
           {grade && (
@@ -1817,6 +1839,18 @@ function UserModal({
   );
 }
 
+const TEMPLATE_VARIABLES = [
+  { key: '{{customer_name}}', label: '고객명' },
+  { key: '{{product_name}}', label: '제품명' },
+  { key: '{{amount}}', label: '금액' },
+  { key: '{{order_number}}', label: '주문번호' },
+  { key: '{{event_name}}', label: '이벤트명' },
+  { key: '{{branch_name}}', label: '지점명' },
+  { key: '{{point_balance}}', label: '포인트잔액' },
+  { key: '{{grade}}', label: '등급' },
+  { key: '{{date}}', label: '날짜' },
+];
+
 function TemplateModal({ template, onClose, onSuccess }: { template: NotificationTemplate | null; onClose: () => void; onSuccess: () => void }) {
   const supabase = createClient();
   const [formData, setFormData] = useState({
@@ -1826,6 +1860,7 @@ function TemplateModal({ template, onClose, onSuccess }: { template: Notificatio
   });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -1852,6 +1887,31 @@ function TemplateModal({ template, onClose, onSuccess }: { template: Notificatio
     await supabase.from('notification_templates').delete().eq('id', template.id);
     onSuccess();
   };
+
+  const insertVariable = (varKey: string) => {
+    const el = textareaRef.current;
+    if (!el) return;
+    const start = el.selectionStart ?? formData.message_template.length;
+    const end = el.selectionEnd ?? start;
+    const current = formData.message_template;
+    const next = current.slice(0, start) + varKey + current.slice(end);
+    setFormData({ ...formData, message_template: next });
+    // Restore focus and cursor after state update
+    requestAnimationFrame(() => {
+      el.focus();
+      const pos = start + varKey.length;
+      el.setSelectionRange(pos, pos);
+    });
+  };
+
+  const removeVariable = (varKey: string) => {
+    setFormData({
+      ...formData,
+      message_template: formData.message_template.split(varKey).join(''),
+    });
+  };
+
+  const usedVars = TEMPLATE_VARIABLES.filter(v => formData.message_template.includes(v.key));
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
@@ -1893,17 +1953,43 @@ function TemplateModal({ template, onClose, onSuccess }: { template: Notificatio
 
           <div>
             <label className="block text-sm font-medium text-gray-700">메시지 템플릿 *</label>
+            <div className="mt-1 mb-2">
+              <p className="text-xs text-slate-500 mb-1.5">변수 클릭 시 커서 위치에 삽입 / 파란색 변수는 이미 사용 중 (클릭 시 제거)</p>
+              <div className="flex flex-wrap gap-1.5">
+                {TEMPLATE_VARIABLES.map(v => {
+                  const inUse = formData.message_template.includes(v.key);
+                  return (
+                    <button
+                      key={v.key}
+                      type="button"
+                      onClick={() => inUse ? removeVariable(v.key) : insertVariable(v.key)}
+                      title={inUse ? `${v.key} 제거` : `${v.key} 삽입`}
+                      className={`px-2 py-0.5 rounded text-xs font-mono border transition-colors ${
+                        inUse
+                          ? 'bg-blue-100 text-blue-700 border-blue-300 hover:bg-red-100 hover:text-red-600 hover:border-red-300'
+                          : 'bg-slate-100 text-slate-600 border-slate-200 hover:bg-slate-200'
+                      }`}
+                    >
+                      {inUse ? '✓ ' : ''}{v.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
             <textarea
+              ref={textareaRef}
               value={formData.message_template}
               onChange={(e) => setFormData({ ...formData, message_template: e.target.value })}
               required
               rows={6}
-              className="mt-1 input"
+              className="input w-full"
               placeholder="{{customer_name}}님, 안녕하세요..."
             />
-            <p className="text-xs text-slate-500 mt-1">
-              변수: {'{{customer_name}}'}, {'{{product_name}}'}, {'{{amount}}'}, {'{{event_name}}'} 등
-            </p>
+            {usedVars.length > 0 && (
+              <p className="text-xs text-blue-600 mt-1">
+                사용 중: {usedVars.map(v => v.key).join(', ')}
+              </p>
+            )}
           </div>
 
           <div className="flex gap-2 pt-4">

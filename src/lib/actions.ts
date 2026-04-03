@@ -728,6 +728,7 @@ export async function createCustomerGrade(formData: FormData) {
   const supabase = await createClient();
   
 
+  const thresholdRaw = formData.get('upgrade_threshold') as string;
   const gradeData = {
     code: formData.get('code') as string,
     name: formData.get('name') as string,
@@ -735,6 +736,7 @@ export async function createCustomerGrade(formData: FormData) {
     color: formData.get('color') as string || '#6366f1',
     sort_order: parseInt(formData.get('sort_order') as string) || 0,
     point_rate: parseFloat(formData.get('point_rate') as string) || 1.00,
+    upgrade_threshold: thresholdRaw && thresholdRaw !== '' ? parseInt(thresholdRaw) : null,
   };
 
   // @ts-ignore
@@ -752,6 +754,7 @@ export async function updateCustomerGrade(id: string, formData: FormData) {
   const supabase = await createClient();
   
 
+  const thresholdRaw = formData.get('upgrade_threshold') as string;
   const gradeData = {
     code: formData.get('code') as string,
     name: formData.get('name') as string,
@@ -760,6 +763,7 @@ export async function updateCustomerGrade(id: string, formData: FormData) {
     sort_order: parseInt(formData.get('sort_order') as string) || 0,
     is_active: formData.get('is_active') === 'true',
     point_rate: parseFloat(formData.get('point_rate') as string) || 1.00,
+    upgrade_threshold: thresholdRaw && thresholdRaw !== '' ? parseInt(thresholdRaw) : null,
   };
 
   // @ts-ignore
@@ -867,10 +871,17 @@ export async function autoUpgradeCustomerGrades() {
     ltv.set(o.customer_id, (ltv.get(o.customer_id) || 0) + (o.total_amount || 0));
   }
 
-  const THRESHOLDS = [
-    { grade: 'VVIP', min: 3_000_000 },
-    { grade: 'VIP',  min: 1_000_000 },
-  ];
+  // 등급 업그레이드 기준을 DB에서 조회
+  const { data: gradeRows } = await db
+    .from('customer_grades')
+    .select('code, upgrade_threshold')
+    .eq('is_active', true)
+    .not('upgrade_threshold', 'is', null);
+
+  const THRESHOLDS = ((gradeRows || []) as { code: string; upgrade_threshold: number }[])
+    .map(g => ({ grade: g.code, min: g.upgrade_threshold }))
+    .sort((a, b) => b.min - a.min); // 높은 기준부터
+
   const GRADE_RANK: Record<string, number> = { NORMAL: 0, VIP: 1, VVIP: 2 };
 
   let upgraded = 0;
