@@ -19,6 +19,7 @@ const ALL_NAV_ITEMS = [
   { href: '/notifications', label: '알림', icon: '📱' },
   { href: '/system-codes', label: '코드', icon: '⚙️' },
   { href: '/reports', label: '보고서', icon: '📈' },
+  { href: '/agent-memory', label: 'AI 메모리', icon: '🧠' },
 ];
 
 const ROLE_LABELS: Record<string, string> = {

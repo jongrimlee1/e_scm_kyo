@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server';
 import { miniMaxClient, MiniMaxMessage } from '@/lib/ai/client';
 import { AGENT_TOOLS, WRITE_TOOLS, executeTool } from '@/lib/ai/tools';
 import { DB_SCHEMA, BUSINESS_RULES } from '@/lib/ai/schema';
+import { loadMemories, extractMemory, extractMemoryFromWrite } from '@/lib/ai/memory';
 
 const SYSTEM_PROMPT = `당신은 경옥채 사내 ERP 시스템의 AI 직원입니다.
 사람 직원처럼 시스템의 모든 업무를 자연어로 처리할 수 있습니다.
@@ -57,10 +58,14 @@ export async function POST(req: NextRequest) {
 
     const supabase = await createClient();
 
+    const db = supabase as any;
+
     // ── 확정된 쓰기 작업: LLM 없이 바로 실행 ────────────────────────────────
     if (confirm && pending_action) {
       const result = await executeTool(pending_action.tool, pending_action.args, supabase);
       const parsed = JSON.parse(result);
+      // 쓰기 결과 메모리 저장 (비동기 fire-and-forget)
+      extractMemoryFromWrite(db, pending_action.tool, pending_action.args, parsed).catch(() => {});
       if (parsed.error) {
         return NextResponse.json({ type: 'error', message: `❌ ${parsed.error}` });
       }
@@ -68,6 +73,9 @@ export async function POST(req: NextRequest) {
       const detail = buildSuccessDetail(pending_action.tool, parsed);
       return NextResponse.json({ type: 'success', message: detail ? `✅ ${msg}\n\n${detail}` : `✅ ${msg}` });
     }
+
+    // ── 메모리 로딩 ──────────────────────────────────────────────────────────
+    const memories = await loadMemories(db).catch(() => '');
 
     // ── 사용자 컨텍스트 주입 ─────────────────────────────────────────────────
     const roleLabels: Record<string, string> = {
@@ -79,9 +87,11 @@ export async function POST(req: NextRequest) {
       context?.branchId ? `담당지점ID: ${context.branchId}` : '',
     ].filter(Boolean).join(' | ');
 
-    const systemContent = contextLines
-      ? `${SYSTEM_PROMPT}\n\n== 현재 사용자 == ${contextLines}`
-      : SYSTEM_PROMPT;
+    const systemContent = [
+      SYSTEM_PROMPT,
+      contextLines ? `\n== 현재 사용자 == ${contextLines}` : '',
+      memories ? `\n${memories}` : '',
+    ].join('');
 
     const messages: MiniMaxMessage[] = [
       { role: 'system', content: systemContent },
@@ -116,8 +126,9 @@ export async function POST(req: NextRequest) {
           });
         }
 
-        // 읽기 도구 → 즉시 실행
+        // 읽기 도구 → 즉시 실행 + 메모리 추출
         const result = await executeTool(toolName, args, supabase);
+        extractMemory(db, toolName, args, result).catch(() => {});
         messages.push({
           role: 'tool',
           tool_call_id: toolCall.id,
