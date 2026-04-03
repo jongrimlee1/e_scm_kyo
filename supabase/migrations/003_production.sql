@@ -6,10 +6,10 @@ ALTER TABLE public.production_orders
   ADD COLUMN IF NOT EXISTS started_at TIMESTAMP WITH TIME ZONE;
 
 -- screen_permissions: 생산 관리 경로 등록
-INSERT INTO public.screen_permissions (role, screen_path, screen_name)
+INSERT INTO public.screen_permissions (role, screen_path, can_view, can_edit)
 VALUES
-  ('SUPER_ADMIN',  '/production', '생산관리'),
-  ('HQ_OPERATOR',  '/production', '생산관리'),
-  ('PHARMACY_STAFF', '/production', '생산관리'),
-  ('BRANCH_STAFF', '/production', '생산관리')
+  ('SUPER_ADMIN',    '/production', true, true),
+  ('HQ_OPERATOR',    '/production', true, true),
+  ('PHARMACY_STAFF', '/production', true, true),
+  ('BRANCH_STAFF',   '/production', true, true)
 ON CONFLICT DO NOTHING;
