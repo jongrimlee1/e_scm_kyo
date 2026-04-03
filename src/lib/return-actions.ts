@@ -3,6 +3,7 @@
 import { createClient } from '@/lib/supabase/server';
 import { revalidatePath } from 'next/cache';
 import { cookies } from 'next/headers';
+import { requireSession, writeAuditLog } from '@/lib/session';
 
 function getUserId(): string | null {
   try {
@@ -30,9 +31,16 @@ export async function processRefund(params: {
   refundMethod: string;
   items: ReturnItem[];
 }) {
+  let session;
+  try {
+    session = await requireSession();
+  } catch (e: any) {
+    return { error: e.message };
+  }
+
   const supabase = await createClient();
   const db = supabase as any;
-  const userId = getUserId();
+  const userId = session.id;
 
   const { originalOrderId, branchId, reason, reasonDetail, refundMethod, items } = params;
 
@@ -202,6 +210,13 @@ export async function processRefund(params: {
     }
     return { error: `환불 처리 실패: ${err.message}` };
   }
+
+  writeAuditLog({
+    userId,
+    action: 'CREATE',
+    tableName: 'return_orders',
+    description: `환불 처리: ${returnNumber}, 금액: ${params.items.reduce((s, i) => s + i.quantity * i.unit_price, 0).toLocaleString()}원`,
+  }).catch(() => {});
 
   revalidatePath('/pos');
   revalidatePath('/inventory');

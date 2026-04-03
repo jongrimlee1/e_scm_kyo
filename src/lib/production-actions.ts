@@ -3,6 +3,7 @@
 import { createClient } from '@/lib/supabase/server';
 import { revalidatePath } from 'next/cache';
 import { cookies } from 'next/headers';
+import { requireSession, writeAuditLog } from '@/lib/session';
 
 function getUserId(): string | null {
   try {
@@ -75,9 +76,12 @@ export async function getProductionOrders(filters?: { branchId?: string; status?
 // ─── 생산 지시 생성 (PENDING) ──────────────────────────────────────────────────
 
 export async function createProductionOrder(formData: FormData) {
+  let session;
+  try { session = await requireSession(); } catch (e: any) { return { error: e.message }; }
+
   const supabase = await createClient();
   const db = supabase as any;
-  const userId = getUserId();
+  const userId = session.id;
 
   const productId = formData.get('product_id') as string;
   const branchId  = formData.get('branch_id') as string;
@@ -126,6 +130,8 @@ export async function createProductionOrder(formData: FormData) {
   });
 
   if (error) return { error: error.message };
+
+  writeAuditLog({ userId, action: 'CREATE', tableName: 'production_orders', description: `생산 지시: ${orderNumber}` }).catch(() => {});
   revalidatePath('/production');
   return { success: true, orderNumber };
 }
@@ -268,6 +274,7 @@ export async function completeProductionOrder(id: string) {
     return { error: `생산 완료 처리 실패: ${err.message}` };
   }
 
+  writeAuditLog({ userId: order.produced_by, action: 'UPDATE', tableName: 'production_orders', recordId: id, description: `생산 완료: ${order.order_number}` }).catch(() => {});
   revalidatePath('/production');
   revalidatePath('/inventory');
   return { success: true };

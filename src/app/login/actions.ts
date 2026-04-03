@@ -4,6 +4,7 @@ import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { createHash } from 'crypto';
 import { cookies } from 'next/headers';
+import { writeAuditLog } from '@/lib/session';
 
 function hashPassword(password: string): string {
   return createHash('sha256').update(password).digest('hex');
@@ -35,8 +36,25 @@ export async function login(formData: FormData): Promise<{ error?: string; succe
   }
 
   // 자체 세션 토큰 생성
-  const sessionToken = createHash('sha256').update(`${user.id}-${Date.now()}`).digest('hex');
-  
+  const sessionToken = createHash('sha256').update(`${user.id}-${Date.now()}-${Math.random()}`).digest('hex');
+
+  // session_tokens 테이블에 저장 (서버 측 무효화 가능)
+  const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+  await (supabase as any).from('session_tokens').insert({
+    user_id: user.id,
+    token_hash: sessionToken,
+    expires_at: expiresAt,
+  });
+
+  // 만료된 세션 정리 (백그라운드)
+  ;(supabase as any).from('session_tokens')
+    .delete()
+    .lt('expires_at', new Date().toISOString())
+    .then(() => {});
+
+  // 감사 로그
+  writeAuditLog({ userId: user.id, action: 'LOGIN', description: `로그인: ${user.name}` }).catch(() => {});
+
   // 쿠키에 세션 저장
   const cookieStore = await cookies();
   cookieStore.set('session_token', sessionToken, {
@@ -82,6 +100,16 @@ export async function login(formData: FormData): Promise<{ error?: string; succe
 
 export async function signOut() {
   const cookieStore = await cookies();
+  const token  = (cookieStore as any).get('session_token')?.value as string | undefined;
+  const userId = (cookieStore as any).get('user_id')?.value as string | undefined;
+
+  if (token) {
+    const supabase = await createClient();
+    await (supabase as any).from('session_tokens').delete().eq('token_hash', token);
+  }
+
+  writeAuditLog({ userId: userId || null, action: 'LOGOUT' }).catch(() => {});
+
   cookieStore.delete('session_token');
   cookieStore.delete('user_id');
   cookieStore.delete('user_name');

@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server';
 import { revalidatePath } from 'next/cache';
 import { cookies } from 'next/headers';
 import { createPurchaseReceiptJournal } from '@/lib/accounting-actions';
+import { writeAuditLog } from '@/lib/session';
 
 function getUserId(): string | null {
   try {
@@ -408,6 +409,8 @@ export async function receivePurchaseOrder(formData: FormData) {
     await db.from('purchase_receipts').delete().eq('id', receiptId);
     return { error: `입고 처리 실패: ${err.message}` };
   }
+
+  writeAuditLog({ userId, action: 'CREATE', tableName: 'purchase_receipts', description: `입고 처리: ${receiptNumber}, 금액: ${totalReceiptAmount.toLocaleString()}원` }).catch(() => {});
 
   // 자동 분개: 재고자산 증가 / 미지급금 증가
   createPurchaseReceiptJournal({
