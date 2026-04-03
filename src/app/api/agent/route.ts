@@ -17,15 +17,26 @@ function log(msg: string, data?: any) {
 }
 
 function parseNaturalLanguageIntent(userMessage: string, aiResponse: string): any {
+  const msg = userMessage.toLowerCase();
   const combined = (userMessage + ' ' + aiResponse).toLowerCase();
   
-  if (combined.includes('고객') && (combined.includes('조회') || combined.includes('검색') || combined.includes('정보'))) {
-    const nameMatch = userMessage.match(/(?:홍길동|[가-힣]+동|([가-힣]{2,4}))(?: 고객)?/);
-    const searchName = nameMatch && nameMatch[1] ? nameMatch[1] : 
-                       userMessage.includes('홍길동') ? '홍길동' : null;
-    if (userMessage.includes('리스트') || userMessage.includes('목록')) {
-      return { operation: 'customer_query', data: {} };
+  if (msg.includes('뭐') || msg.includes('무엇') || msg.includes('어떤') || 
+      (msg.includes('할') && msg.includes('수')) || msg.includes('도움') ||
+      msg.includes('기능') || msg.includes('능력')) {
+    return { 
+      operation: 'info', 
+      data: { 
+        message: 'AI 어시스턴트가 도와드릴 수 있습니다:\n• 고객 조회/검색/등록\n• 재고 이동/조정/입출고\n• 포인트 적립/사용/조회\n• 제품 검색\n• 지점 조회\n• 판매 주문 조회'
+      } 
+    };
+  }
+  
+  if (combined.includes('고객') || msg.includes('고객')) {
+    if (msg.includes('없') || msg.includes('찾') || msg.includes('검색')) {
+      return { operation: 'customer_query', data: { search: '' } };
     }
+    const nameMatch = userMessage.match(/(?:([가-힣]{2,4})동|([가-힣]{2,4})님)/);
+    const searchName = nameMatch ? (nameMatch[1] || nameMatch[2]) : null;
     return { operation: 'customer_query', data: { search: searchName } };
   }
   
@@ -39,15 +50,6 @@ function parseNaturalLanguageIntent(userMessage: string, aiResponse: string): an
   
   if (combined.includes('포인트') && combined.includes('조회')) {
     return { operation: 'point_query', data: {} };
-  }
-  
-  if (combined.includes('무엇') || combined.includes('뭐') || combined.includes('도움')) {
-    return { 
-      operation: 'info', 
-      data: { 
-        message: 'AI 어시스턴트가 도와드릴 수 있습니다: 고객 조회, 재고 이동/조정, 포인트 적립/사용, 제품 검색 등'
-      } 
-    };
   }
   
   return null;
@@ -349,8 +351,15 @@ async function executeOperation(supabase: any, operation: string, data: Record<s
 
       if (error) throw new Error(`고객 조회 실패: ${error.message}`);
 
+      if (!customers || customers.length === 0) {
+        return {
+          message: search ? `"${search}" 고객을 찾을 수 없습니다` : '등록된 고객이 없습니다',
+          data: [],
+        };
+      }
+
       return {
-        message: `${customers?.length || 0}명 고객 조회됨`,
+        message: `${customers.length}명 고객 조회됨`,
         data: customers,
       };
     }
@@ -374,8 +383,9 @@ async function executeOperation(supabase: any, operation: string, data: Record<s
     }
 
     case 'info': {
+      const helpMessage = data?.message || 'AI 어시스턴트가 도와드릴 수 있습니다:\n• 고객 조회/검색/등록\n• 재고 이동/조정/입출고\n• 포인트 적립/사용/조회\n• 제품 검색\n• 지점 조회\n• 판매 주문 조회';
       return {
-        message: data?.message || 'AI 어시스턴트가 도와드릴 수 있습니다: 고객 조회/검색, 재고 이동/조정, 포인트 적립/사용, 제품 검색, 지점 조회 등',
+        message: helpMessage,
         data: data || {},
       };
     }
