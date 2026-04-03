@@ -250,25 +250,33 @@ export default function InventoryPage() {
                     </td>
                     {branches.map(b => {
                       const inv = row.byBranch[b.id];
-                      if (!inv) {
-                        return (
-                          <td key={b.id} className="text-center text-slate-300">-</td>
-                        );
-                      }
-                      const isLow = inv.quantity < inv.safety_stock;
+                      // 레코드가 없는 지점은 가상 재고 객체로 처리 (재고 0, 클릭 가능)
+                      const effective: Inventory = inv ?? {
+                        id: '',
+                        branch_id: b.id,
+                        product_id: row.productId,
+                        quantity: 0,
+                        safety_stock: 0,
+                        branch: b,
+                        product: { id: row.productId, name: row.productName, code: row.productCode, barcode: row.barcode },
+                      };
+                      const isLow = effective.quantity < effective.safety_stock;
+                      const isMissing = !inv;
                       return (
                         <td key={b.id} className="text-center p-0">
                           <button
-                            onClick={() => handleAdjust(inv)}
-                            title={`입출고 · 안전재고 ${inv.safety_stock}`}
+                            onClick={() => handleAdjust(effective)}
+                            title={isMissing ? '재고 없음 · 클릭하여 입고' : `입출고 · 안전재고 ${effective.safety_stock}`}
                             className={`w-full h-full px-3 py-2 font-semibold transition-colors rounded hover:ring-2 hover:ring-blue-300 hover:ring-inset ${
-                              isLow
-                                ? 'text-red-600 bg-red-50 hover:bg-red-100'
-                                : 'text-slate-800 hover:bg-blue-50'
+                              isMissing
+                                ? 'text-slate-300 hover:bg-blue-50 hover:text-slate-600'
+                                : isLow
+                                  ? 'text-red-600 bg-red-50 hover:bg-red-100'
+                                  : 'text-slate-800 hover:bg-blue-50'
                             }`}
                           >
-                            {inv.quantity}
-                            {isLow && <span className="ml-1 text-xs font-normal">↓{inv.safety_stock}</span>}
+                            {effective.quantity}
+                            {isLow && !isMissing && <span className="ml-1 text-xs font-normal">↓{effective.safety_stock}</span>}
                           </button>
                         </td>
                       );
