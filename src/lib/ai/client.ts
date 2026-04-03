@@ -3,13 +3,6 @@ export interface MiniMaxMessage {
   content: string;
 }
 
-export interface MiniMaxChatRequest {
-  model: string;
-  messages: MiniMaxMessage[];
-  temperature?: number;
-  max_tokens?: number;
-}
-
 export interface MiniMaxChatResponse {
   id: string;
   choices: {
@@ -47,7 +40,10 @@ export class MiniMaxClient {
       throw new Error('MINIMAX_API_KEY is not set');
     }
 
-    const response = await fetch(`${this.baseUrl}/v1/text/chatcompletion`, {
+    console.log('MiniMax API call with model:', this.model);
+    console.log('Base URL:', this.baseUrl);
+
+    const response = await fetch(`${this.baseUrl}/v1/text/chatcompletion_v2`, {
       method: 'POST',
       headers: this.getHeaders(),
       body: JSON.stringify({
@@ -61,12 +57,16 @@ export class MiniMaxClient {
       }),
     });
 
+    console.log('MiniMax response status:', response.status);
+
     if (!response.ok) {
       const error = await response.text();
+      console.error('MiniMax API error:', error);
       throw new Error(`MiniMax API error: ${response.status} - ${error}`);
     }
 
     const data: MiniMaxChatResponse = await response.json();
+    console.log('MiniMax response data:', JSON.stringify(data).substring(0, 500));
     
     if (!data.choices || data.choices.length === 0) {
       throw new Error('No response from MiniMax');
