@@ -77,13 +77,17 @@ ${message}
       { role: 'user', content: message },
     ];
 
+    console.log('Calling MiniMax...');
     const response = await miniMaxClient.chat(messages);
+    console.log('MiniMax raw response:', response.substring(0, 500));
 
     let intent: IntentResult;
     try {
       const cleaned = response.replace(/```json\n?/g, '').replace(/\n?```/g, '').trim();
+      console.log('Cleaned response:', cleaned.substring(0, 200));
       intent = JSON.parse(cleaned);
-    } catch (e) {
+    } catch (e: any) {
+      console.error('JSON parse error:', e.message);
       return NextResponse.json({
         type: 'error',
         message: '명령을 이해하지 못했습니다. 다시 입력해주세요.',
