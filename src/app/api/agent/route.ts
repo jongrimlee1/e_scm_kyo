@@ -83,7 +83,7 @@ export async function POST(req: NextRequest) {
       if (finish_reason !== 'tool_calls' || !responseMsg.tool_calls?.length) {
         return NextResponse.json({
           type: 'success',
-          message: responseMsg.content || '요청을 처리했습니다.',
+          message: stripThinkTags(responseMsg.content) || '요청을 처리했습니다.',
         });
       }
 
@@ -130,6 +130,10 @@ export async function POST(req: NextRequest) {
       { status: 500 }
     );
   }
+}
+
+function stripThinkTags(content: string): string {
+  return content.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
 }
 
 function buildConfirmDescription(toolName: string, args: Record<string, any>): string {
