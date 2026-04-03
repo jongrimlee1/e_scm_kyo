@@ -5,89 +5,96 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 @AGENTS.md
 
 ## Commands
-
 ```bash
-npm run dev      # Start dev server on localhost:3000
-npm run build    # Production build
-npm run lint     # ESLint (Next.js config)
+npm run dev    # dev server localhost:3000
+npm run build  # production build
+npm run lint   # ESLint
 ```
 
-There is no test runner configured.
+## Stack
+Next.js 16 (App Router) · TypeScript · Tailwind CSS v4 · Supabase (PostgreSQL) · Cafe24
 
-## Architecture
+**경옥채 사내 통합시스템** — multi-branch pharmaceutical/wellness ERP/CRM
 
-**경옥채 사내 통합시스템** — ERP/CRM/Dashboard for a multi-branch pharmaceutical/wellness company.
+## Auth
+Custom session auth (not Supabase Auth). Login → SHA256 password check against `users` table → httpOnly cookies:
+- Server-only: `session_token`, `user_id`
+- Client-readable: `user_name`, `user_role`, `user_branch_id`
 
-**Stack:** Next.js 16 (App Router), TypeScript, Tailwind CSS v4, Supabase (PostgreSQL), Cafe24 e-commerce integration.
+Middleware: `src/lib/supabase/middleware.ts` · Auth logic: `src/app/login/actions.ts`
 
-### Route Structure
-
-- `src/app/(dashboard)/` — Protected routes behind role-based layout with sidebar nav
-- `src/app/login/` — Public auth page using server actions
-- `src/app/api/dashboard/` — Dashboard metrics aggregation endpoint
-- `src/app/api/webhooks/cafe24/` — Cafe24 e-commerce webhook handler
-
-### Authentication
-
-**Custom session auth, not Supabase Auth.** Login validates `login_id` + SHA256 password against the `users` table, then sets httpOnly cookies:
-- `session_token`, `user_id` — server-only verification
-- `user_name`, `user_role`, `user_branch_id` — readable on client for UI filtering
-
-`src/lib/supabase/middleware.ts` handles session refresh and redirect-to-login for unauthenticated requests. The actual auth logic is in `src/app/login/actions.ts`.
-
-### Role System
-
-```typescript
-type UserRole = 'SUPER_ADMIN' | 'HQ_OPERATOR' | 'PHARMACY_STAFF' | 'BRANCH_STAFF' | 'EXECUTIVE';
+## Roles
 ```
+SUPER_ADMIN | HQ_OPERATOR | PHARMACY_STAFF | BRANCH_STAFF | EXECUTIVE
+```
+- `BRANCH_STAFF` / `PHARMACY_STAFF`: locked to their branch — hide/disable branch selectors
+- Nav filtered by `screen_permissions` table (`app/(dashboard)/layout.tsx`)
 
-- Navigation items filtered by `screen_permissions` table (queried in `app/(dashboard)/layout.tsx`)
-- `BRANCH_STAFF` / `PHARMACY_STAFF` are locked to their assigned branch (`user_branch_id` cookie) — branch selectors are hidden or disabled for these roles
-- HQ roles (`SUPER_ADMIN`, `HQ_OPERATOR`) see cross-branch data
+## Data Access
+| Pattern | Where |
+|---------|-------|
+| Mutations | `src/lib/actions.ts` server actions → `revalidatePath()` |
+| Server reads | `src/lib/supabase/server.ts` (SSR, cookie-aware) |
+| Client reads | `src/lib/supabase/client.ts` → `useEffect` |
+| API routes | Dashboard aggregation + Cafe24 webhooks only |
 
-### Data Access Patterns
+Domain-specific actions split into: `purchase-actions.ts`, `production-actions.ts`, `return-actions.ts`, `notification-actions.ts`, `accounting-actions.ts`, `customer-analytics-actions.ts`
 
-- **Mutations:** Next.js server actions in `src/lib/actions.ts` — all CRUD goes here, ends with `revalidatePath()`
-- **Reads in server components:** `src/lib/supabase/server.ts` (cookie-aware SSR client)
-- **Reads in client components:** `src/lib/supabase/client.ts` (browser client), fetched in `useEffect`
-- **API routes:** Used only for dashboard aggregation and Cafe24 webhooks
-
-### Key Domain Tables
-
+## Key Tables
 | Table | Purpose |
 |-------|---------|
-| `branches` | Store locations with channel type (STORE/DEPT_STORE/ONLINE/EVENT) |
-| `products` + `inventories` | Product master + per-branch stock levels |
-| `inventory_movements` | Audit log: IN/OUT/ADJUST/PRODUCTION |
-| `sales_orders` + `sales_order_items` | Transactions from POS and online |
-| `customers` + `customer_grades` | CRM with loyalty points |
-| `screen_permissions` | Role → screen path access control |
-| `cafe24_sync_logs` | Webhook processing audit trail |
+| `branches` | Locations · channel: STORE/DEPT_STORE/ONLINE/EVENT |
+| `products` + `inventories` | Product master + per-branch stock |
+| `inventory_movements` | Audit: IN/OUT/ADJUST/PRODUCTION |
+| `sales_orders` + `sales_order_items` | POS + online transactions |
+| `customers` + `customer_grades` | CRM · loyalty points via `point_history.balance` |
+| `screen_permissions` | Role → route access |
 
-Full schema in `supabase/schema.sql`.
+Schema: `supabase/schema.sql` · Migrations: `supabase/migrations/`
 
-### POS Checkout Flow
+## Business Rules
+- Creating a product auto-inserts `inventories` rows for every active branch (qty=0)
+- `customers` has no `total_points` column — read latest `point_history.balance` instead
+- POS flow: `sales_order` → `sales_order_items` → deduct `inventories` → `inventory_movements(OUT)` → optional `point_history`
+- Cafe24 webhook: verify HMAC-SHA256 → `Cafe24Client.getOrder()` → upsert `sales_order(ONLINE)` → `cafe24_sync_logs`
+- VAT: prices are tax-inclusive · supply = price ÷ 1.1 · VAT = price × 10/110
 
-1. Create `sales_order` record
-2. Create `sales_order_items`
-3. Deduct from `inventories` + create `inventory_movements` (OUT)
-4. Optionally create `point_history` for loyalty
-
-### Cafe24 Webhook Flow
-
-`POST /api/webhooks/cafe24` → verify HMAC-SHA256 signature → `Cafe24Client.getOrder()` → upsert `sales_order` (ONLINE channel) → log in `cafe24_sync_logs`. Status updates (`order.paid`, `order.shipped`, etc.) update the order record.
-
-### Product Creation Side Effect
-
-Creating a product automatically inserts `inventories` rows for every active branch (qty=0). This keeps inventory queries consistent across branches.
-
-## Environment Variables
-
+## Env Vars
 ```
-NEXT_PUBLIC_SUPABASE_URL
-NEXT_PUBLIC_SUPABASE_ANON_KEY
-CAFE24_MALL_ID
-CAFE24_CLIENT_ID
-CAFE24_CLIENT_SECRET
-CAFE24_SHOP_NO
+NEXT_PUBLIC_SUPABASE_URL  NEXT_PUBLIC_SUPABASE_ANON_KEY
+CAFE24_MALL_ID  CAFE24_CLIENT_ID  CAFE24_CLIENT_SECRET  CAFE24_SHOP_NO
 ```
+
+---
+
+## Three Man Team — Multi-Agent Workflow
+
+복잡한 작업을 3개 에이전트가 병렬로 처리하는 구성.
+
+### 역할
+| 역할 | 담당 |
+|------|------|
+| **Orchestrator** (메인) | 요청 분해 → 서브에이전트 위임 → 결과 통합 · 충돌 조정 |
+| **Worker A** | 독립 worktree에서 기능 구현 (주로 UI/페이지) |
+| **Worker B** | 독립 worktree에서 기능 구현 (주로 액션/DB) |
+
+### 사용 기준
+- 파일 겹침이 없는 독립 작업 2개 이상일 때만 병렬화
+- 단일 파일 수정 작업은 병렬화 불필요
+
+### Orchestrator 실행 예시
+```
+Agent(subagent_type="general-purpose", isolation="worktree",
+  prompt="[Worker A] src/app/(dashboard)/X/page.tsx 에 ... 구현. 
+          건드릴 파일: page.tsx, CustomerModal.tsx만")
+
+Agent(subagent_type="general-purpose", isolation="worktree",
+  prompt="[Worker B] src/lib/actions.ts 에 ... 액션 추가.
+          건드릴 파일: actions.ts만")
+```
+
+### 규칙
+1. 각 Worker에게 **건드릴 파일 목록을 명시** — 겹치면 병렬 불가
+2. Worker는 commit하지 않음 — Orchestrator가 결과 검토 후 통합
+3. DB 스키마 변경(migration)은 항상 Orchestrator가 직접 처리
+4. 빌드 검증(`npm run build`)은 통합 후 Orchestrator가 실행

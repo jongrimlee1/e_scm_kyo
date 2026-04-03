@@ -1,0 +1,22 @@
+# 빌드 아웃풋 & 캐시
+.next/
+tsconfig.tsbuildinfo
+
+# 의존성 (소스 아님)
+node_modules/
+
+# 정적 에셋
+public/
+
+# 바이너리 문서 (읽기 불가)
+doc/*.pdf
+doc/*.docx
+doc/*.doc
+doc/경옥채_사내통합시스템_PRD_v1.0/
+doc/경옥채_사내통합시스템_TDD_v1.0/
+
+# Lock 파일 (npm이 관리)
+package-lock.json
+
+# 일회성 스크립트
+scripts/
