@@ -11,12 +11,14 @@
 
 -- ── branches: 공개 읽기 허용 (지점명은 민감 정보 아님), 쓰기는 authenticated만
 DROP POLICY IF EXISTS branches_select ON branches;
+DROP POLICY IF EXISTS branches_write ON branches;
 DROP POLICY IF EXISTS branches_all ON branches;
 CREATE POLICY branches_select ON branches FOR SELECT USING (true);
 CREATE POLICY branches_write ON branches FOR ALL TO authenticated USING (true) WITH CHECK (true);
 
 -- ── products: 공개 읽기 허용, 쓰기는 authenticated만
 DROP POLICY IF EXISTS products_select ON products;
+DROP POLICY IF EXISTS products_write ON products;
 DROP POLICY IF EXISTS products_all ON products;
 CREATE POLICY products_select ON products FOR SELECT USING (true);
 CREATE POLICY products_write ON products FOR ALL TO authenticated USING (true) WITH CHECK (true);
@@ -35,6 +37,8 @@ CREATE POLICY customers_all ON customers FOR ALL TO authenticated USING (true) W
 
 -- ── customer_grades: 공개 읽기, 쓰기는 authenticated
 DROP POLICY IF EXISTS customer_grades_all ON customer_grades;
+DROP POLICY IF EXISTS customer_grades_select ON customer_grades;
+DROP POLICY IF EXISTS customer_grades_write ON customer_grades;
 CREATE POLICY customer_grades_select ON customer_grades FOR SELECT USING (true);
 CREATE POLICY customer_grades_write ON customer_grades FOR ALL TO authenticated USING (true) WITH CHECK (true);
 
@@ -85,11 +89,15 @@ CREATE POLICY notification_templates_all ON notification_templates FOR ALL TO au
 
 -- ── users: authenticated만, 패스워드 컬럼 노출 금지
 DROP POLICY IF EXISTS users_all ON users;
+DROP POLICY IF EXISTS users_select ON users;
+DROP POLICY IF EXISTS users_write ON users;
 CREATE POLICY users_select ON users FOR SELECT TO authenticated USING (true);
 CREATE POLICY users_write ON users FOR ALL TO authenticated USING (true) WITH CHECK (true);
 
 -- ── screen_permissions: 공개 읽기 (로그인 전 메뉴 결정에 필요), 쓰기 authenticated
 DROP POLICY IF EXISTS screen_permissions_all ON screen_permissions;
+DROP POLICY IF EXISTS screen_permissions_select ON screen_permissions;
+DROP POLICY IF EXISTS screen_permissions_write ON screen_permissions;
 CREATE POLICY screen_permissions_select ON screen_permissions FOR SELECT USING (true);
 CREATE POLICY screen_permissions_write ON screen_permissions FOR ALL TO authenticated USING (true) WITH CHECK (true);
 
