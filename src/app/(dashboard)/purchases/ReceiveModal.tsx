@@ -120,6 +120,7 @@ export default function ReceiveModal({ purchaseOrderId, branchId, branchName, it
                         max={item.remaining}
                         value={receiveQtys[item.id] ?? 0}
                         onChange={e => setQty(item.id, parseInt(e.target.value) || 0, item.remaining)}
+                        onFocus={e => e.target.select()}
                         className="input text-center w-24 mx-auto block"
                       />
                     </td>

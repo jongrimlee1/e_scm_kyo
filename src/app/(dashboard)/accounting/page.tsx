@@ -485,6 +485,7 @@ export default function AccountingPage() {
                             updateManualLine(idx, 'debit', e.target.value);
                             if (e.target.value) updateManualLine(idx, 'credit', '');
                           }}
+                          onFocus={e => e.target.select()}
                           className="input text-right w-28"
                           placeholder="0"
                         />
@@ -496,6 +497,7 @@ export default function AccountingPage() {
                             updateManualLine(idx, 'credit', e.target.value);
                             if (e.target.value) updateManualLine(idx, 'debit', '');
                           }}
+                          onFocus={e => e.target.select()}
                           className="input text-right w-28"
                           placeholder="0"
                         />

@@ -255,6 +255,7 @@ export default function InventoryModal({ inventory, onClose, onSuccess }: Props)
               type="number"
               value={formData.quantity}
               onChange={(e) => setFormData({ ...formData, quantity: parseInt(e.target.value) || 0 })}
+              onFocus={(e) => e.target.select()}
               required
               min="0"
               className="mt-1 input"
@@ -271,6 +272,7 @@ export default function InventoryModal({ inventory, onClose, onSuccess }: Props)
                 type="number"
                 value={formData.safety_stock}
                 onChange={(e) => setFormData({ ...formData, safety_stock: parseInt(e.target.value) || 0 })}
+                onFocus={(e) => e.target.select()}
                 min="0"
                 className="mt-1 input"
               />

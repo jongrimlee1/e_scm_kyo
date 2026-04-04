@@ -1060,6 +1060,7 @@ function ChannelModal({ channel, onClose, onSuccess }: { channel: Channel | null
               type="number"
               value={formData.sort_order}
               onChange={(e) => setFormData({ ...formData, sort_order: parseInt(e.target.value) || 0 })}
+              onFocus={(e) => e.target.select()}
               min="0"
               className="mt-1 input"
             />
@@ -1312,6 +1313,7 @@ function GradeModal({ grade, onClose, onSuccess }: { grade: CustomerGrade | null
                 type="number"
                 value={formData.sort_order}
                 onChange={(e) => setFormData({ ...formData, sort_order: parseInt(e.target.value) || 0 })}
+                onFocus={(e) => e.target.select()}
                 min="0"
                 className="mt-1 input"
               />
@@ -1370,6 +1372,7 @@ function GradeModal({ grade, onClose, onSuccess }: { grade: CustomerGrade | null
               max="100"
               value={formData.point_rate}
               onChange={(e) => setFormData({ ...formData, point_rate: parseFloat(e.target.value) || 0 })}
+              onFocus={(e) => e.target.select()}
               className="mt-1 input"
               placeholder="1.00"
             />
@@ -1383,6 +1386,7 @@ function GradeModal({ grade, onClose, onSuccess }: { grade: CustomerGrade | null
               step="10000"
               value={formData.upgrade_threshold}
               onChange={(e) => setFormData({ ...formData, upgrade_threshold: e.target.value })}
+              onFocus={(e) => e.target.select()}
               className="mt-1 input"
               placeholder="미설정 시 자동 업그레이드 없음"
             />
@@ -1626,6 +1630,7 @@ function CategoryModal({
               type="number"
               value={formData.sort_order}
               onChange={(e) => setFormData({ ...formData, sort_order: parseInt(e.target.value) || 0 })}
+              onFocus={(e) => e.target.select()}
               min="0"
               className="mt-1 input"
             />

@@ -204,11 +204,13 @@ export default function PurchaseOrderModal({ onClose, onSuccess }: Props) {
                       <td>
                         <input type="number" min={1} value={item.ordered_quantity}
                           onChange={e => updateItem(idx, 'ordered_quantity', parseInt(e.target.value) || 1)}
+                          onFocus={e => e.target.select()}
                           className="input text-center w-24" />
                       </td>
                       <td>
                         <input type="number" min={0} value={item.unit_price}
                           onChange={e => updateItem(idx, 'unit_price', parseInt(e.target.value) || 0)}
+                          onFocus={e => e.target.select()}
                           className="input text-right w-32" />
                       </td>
                       <td className="text-right font-medium text-sm">

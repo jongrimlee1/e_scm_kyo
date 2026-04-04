@@ -381,6 +381,7 @@ function NewOrderModal({ products, branchId, branchName, onClose, onSuccess }: {
             <input
               type="number" min="1" value={quantity}
               onChange={e => setQuantity(Math.max(1, parseInt(e.target.value) || 1))}
+              onFocus={e => e.target.select()}
               className="input"
             />
           </div>
@@ -561,6 +562,7 @@ function BomModal({ products, bomList: initialBomList, onClose, onSuccess }: {
                 <input
                   type="number" min="0.001" step="0.001" value={quantity}
                   onChange={e => setQuantity(parseFloat(e.target.value) || 1)}
+                  onFocus={e => e.target.select()}
                   className="input"
                 />
               </div>

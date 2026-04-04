@@ -551,6 +551,7 @@ export default function POSPage() {
                         type="number"
                         value={pointsToUse}
                         onChange={e => setPointsToUse(Math.min(parseInt(e.target.value) || 0, Math.min(selectedCustomer.currentPoints || 0, total)))}
+                        onFocus={e => e.target.select()}
                         className="input w-20 text-right text-xs py-1"
                         min="0" max={Math.min(selectedCustomer.currentPoints || 0, total)}
                       />

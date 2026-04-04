@@ -177,6 +177,7 @@ export default function ProductModal({ product, onClose, onSuccess }: Props) {
                   setFormData({ ...formData, price: val === '' ? 0 : parseInt(val) || 0 });
                   setFieldErrors({ ...fieldErrors, price: '' });
                 }}
+                onFocus={(e) => e.target.select()}
                 required
                 min="0"
                 className={`mt-1 input ${fieldErrors.price ? 'border-red-500' : ''}`}
@@ -194,6 +195,7 @@ export default function ProductModal({ product, onClose, onSuccess }: Props) {
                   setFormData({ ...formData, cost: parseInt(e.target.value) || null });
                   setFieldErrors({ ...fieldErrors, cost: '' });
                 }}
+                onFocus={(e) => e.target.select()}
                 min="0"
                 className={`mt-1 input ${fieldErrors.cost ? 'border-red-500' : ''}`}
               />

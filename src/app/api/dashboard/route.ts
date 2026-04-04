@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { cookies } from 'next/headers';
 import { createClient } from '@/lib/supabase/server';
 
 interface ChannelSales {
@@ -38,7 +39,15 @@ export async function GET(request: NextRequest) {
   const supabase = await createClient();
   const searchParams = request.nextUrl.searchParams;
   const channel = searchParams.get('channel');
-  const branchId = searchParams.get('branch_id');
+
+  // 서버 사이드에서 사용자 역할/지점 확인 — 지점 스태프는 본인 지점만 허용
+  const cookieStore = await cookies();
+  const userRole = cookieStore.get('user_role')?.value;
+  const userBranchId = cookieStore.get('user_branch_id')?.value;
+  const isBranchUser = userRole === 'BRANCH_STAFF' || userRole === 'PHARMACY_STAFF';
+
+  // 지점 사용자면 쿼리 파라미터 무시하고 본인 지점으로 강제
+  const branchId = isBranchUser ? (userBranchId || null) : searchParams.get('branch_id');
 
   const today = new Date().toISOString().split('T')[0];
   const monthStart = today.substring(0, 7) + '-01';
@@ -86,40 +95,68 @@ export async function GET(request: NextRequest) {
   ] = await Promise.all([
     salesQuery,
     monthSalesQuery,
-    supabase
-      .from('sales_orders')
-      .select('channel, total_amount')
-      .gte('ordered_at', `${monthStart}T00:00:00`),
+    (() => {
+      let q = supabase
+        .from('sales_orders')
+        .select('channel, total_amount')
+        .gte('ordered_at', `${monthStart}T00:00:00`);
+      if (branchId && branchId !== 'ALL') q = q.eq('branch_id', branchId);
+      return q;
+    })(),
     recentOrdersQuery,
-    supabase
-      .from('inventories')
-      .select('id, quantity, safety_stock, product:products(name), branch:branches(id, name)')
-      .lt('quantity', 10)
-      .limit(20),
-    supabase.from('branches').select('id, name'),
-    supabase
-      .from('sales_orders')
-      .select('total_amount')
-      .eq('channel', 'ONLINE')
-      .gte('ordered_at', `${today}T00:00:00`)
-      .lt('ordered_at', `${today}T23:59:59`),
+    (() => {
+      let q = supabase
+        .from('inventories')
+        .select('id, quantity, safety_stock, product:products(name), branch:branches(id, name)')
+        .lt('quantity', 10)
+        .limit(20);
+      if (branchId && branchId !== 'ALL') q = q.eq('branch_id', branchId);
+      return q;
+    })(),
+    (() => {
+      let q = supabase.from('branches').select('id, name');
+      if (branchId && branchId !== 'ALL') q = q.eq('id', branchId);
+      return q;
+    })(),
+    (() => {
+      let q = supabase
+        .from('sales_orders')
+        .select('total_amount')
+        .eq('channel', 'ONLINE')
+        .gte('ordered_at', `${today}T00:00:00`)
+        .lt('ordered_at', `${today}T23:59:59`);
+      if (branchId && branchId !== 'ALL') q = q.eq('branch_id', branchId);
+      return q;
+    })(),
     // 이번달 매입액 (확정 이상)
-    supabase
-      .from('purchase_orders')
-      .select('total_amount')
-      .in('status', ['CONFIRMED', 'PARTIALLY_RECEIVED', 'RECEIVED'])
-      .gte('ordered_at', `${monthStart}T00:00:00`),
+    (() => {
+      let q = supabase
+        .from('purchase_orders')
+        .select('total_amount')
+        .in('status', ['CONFIRMED', 'PARTIALLY_RECEIVED', 'RECEIVED'])
+        .gte('ordered_at', `${monthStart}T00:00:00`);
+      if (branchId && branchId !== 'ALL') q = q.eq('branch_id', branchId);
+      return q;
+    })(),
     // 이번달 환불액
-    supabase
-      .from('return_orders')
-      .select('refund_amount')
-      .eq('status', 'COMPLETED')
-      .gte('processed_at', `${monthStart}T00:00:00`),
+    (() => {
+      let q = supabase
+        .from('return_orders')
+        .select('refund_amount')
+        .eq('status', 'COMPLETED')
+        .gte('processed_at', `${monthStart}T00:00:00`);
+      if (branchId && branchId !== 'ALL') q = q.eq('branch_id', branchId);
+      return q;
+    })(),
     // 진행중 발주 건수
-    supabase
-      .from('purchase_orders')
-      .select('id', { count: 'exact', head: true })
-      .in('status', ['DRAFT', 'CONFIRMED', 'PARTIALLY_RECEIVED']),
+    (() => {
+      let q = supabase
+        .from('purchase_orders')
+        .select('id', { count: 'exact', head: true })
+        .in('status', ['DRAFT', 'CONFIRMED', 'PARTIALLY_RECEIVED']);
+      if (branchId && branchId !== 'ALL') q = q.eq('branch_id', branchId);
+      return q;
+    })(),
   ]);
 
   const todaySales = (todaySalesResult.data || []) as { total_amount: number }[];
@@ -156,9 +193,9 @@ export async function GET(request: NextRequest) {
   }
 
   for (const inv of lowInventory) {
-    const branchId = (inv.branch as any)?.id;
-    if (branchId && branchInventoryMap.has(branchId)) {
-      const current = branchInventoryMap.get(branchId)!;
+    const invBranchId = (inv.branch as any)?.id;
+    if (invBranchId && branchInventoryMap.has(invBranchId)) {
+      const current = branchInventoryMap.get(invBranchId)!;
       current.low_stock_items++;
       current.total_products++;
     }

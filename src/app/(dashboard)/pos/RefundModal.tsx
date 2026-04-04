@@ -210,6 +210,7 @@ export default function RefundModal({ branchId, onClose, onSuccess }: Props) {
                             max={item.quantity}
                             value={selectedItems[item.id] ?? 0}
                             onChange={e => updateQty(item.id, parseInt(e.target.value) || 0, item.quantity)}
+                            onFocus={e => e.target.select()}
                             className="input text-center w-20 mx-auto block"
                           />
                         </td>
