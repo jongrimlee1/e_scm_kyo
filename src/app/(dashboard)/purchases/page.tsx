@@ -98,15 +98,15 @@ export default function PurchasesPage() {
   return (
     <div className="space-y-5">
       {/* 헤더 */}
-      <div className="flex flex-col sm:flex-row justify-between gap-3">
-        <div className="flex gap-2">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4 sm:mb-6">
+        <div className="flex flex-wrap gap-2">
           <Link href="/purchases/suppliers" className="btn-secondary py-2 px-4 text-sm">공급업체 관리</Link>
         </div>
         <button onClick={() => setShowModal(true)} className="btn-primary">+ 발주서 작성</button>
       </div>
 
       {/* 요약 카드 */}
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
         <div className="card text-center">
           <p className="text-sm text-slate-500">전체 발주</p>
           <p className="text-2xl font-bold text-slate-800 mt-1">{stats.total}건</p>
@@ -123,7 +123,7 @@ export default function PurchasesPage() {
 
       {/* 필터 */}
       <div className="card">
-        <div className="flex flex-wrap gap-3 mb-4">
+        <div className="flex flex-col sm:flex-row gap-3 flex-wrap mb-4">
           <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} className="input w-36">
             <option value="">전체 상태</option>
             {Object.entries(STATUS_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
@@ -135,7 +135,7 @@ export default function PurchasesPage() {
         </div>
 
         <div className="overflow-x-auto">
-          <table className="table">
+          <table className="table min-w-[700px]">
             <thead>
               <tr>
                 <th>발주번호</th>

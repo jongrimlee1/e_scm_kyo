@@ -898,3 +898,140 @@ export async function autoUpgradeCustomerGrades() {
   revalidatePath('/customers');
   return { upgraded };
 }
+
+// ============ POS Checkout ============
+
+export interface CartItem {
+  productId: string;
+  name: string;
+  price: number;
+  quantity: number;
+}
+
+export interface CheckoutPayload {
+  branchId: string;
+  branchCode: string;
+  branchName: string;
+  branchChannel: string;
+  customerId: string | null;
+  gradePointRate: number;
+  cart: CartItem[];
+  totalAmount: number;
+  discountAmount: number;
+  finalAmount: number;
+  paymentMethod: string;
+  usePoints: boolean;
+  pointsToUse: number;
+  cashReceived?: number;
+  userId: string | null;
+}
+
+export async function processPosCheckout(payload: CheckoutPayload) {
+  const supabase = await createClient();
+  const db = supabase as any;
+
+  const {
+    branchId, branchCode, branchChannel, customerId, gradePointRate,
+    cart, totalAmount, discountAmount, finalAmount, paymentMethod,
+    usePoints, pointsToUse, userId,
+  } = payload;
+
+  // ① 재고 사전 확인
+  for (const item of cart) {
+    const { data: inv } = await supabase
+      .from('inventories').select('id, quantity')
+      .eq('branch_id', branchId).eq('product_id', item.productId).single();
+    const qty = (inv as any)?.quantity ?? 0;
+    if (!inv || qty < item.quantity) {
+      return { error: `"${item.name}" 재고 부족 (현재: ${qty}개, 요청: ${item.quantity}개)` };
+    }
+  }
+
+  // ② 판매 전표 생성
+  const today = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+  const randomSuffix = Math.random().toString(36).substring(2, 6).toUpperCase();
+  const orderNumber = `SA-${branchCode}-${today}-${randomSuffix}`;
+
+  const pointsEarned = customerId
+    ? Math.floor(finalAmount * (gradePointRate || 1.0) / 100)
+    : 0;
+
+  const { data: saleOrder, error: saleError } = await db.from('sales_orders').insert({
+    order_number: orderNumber,
+    channel: branchChannel || 'STORE',
+    branch_id: branchId,
+    customer_id: customerId || null,
+    ordered_by: userId || null,
+    total_amount: totalAmount,
+    discount_amount: discountAmount,
+    status: 'COMPLETED',
+    payment_method: paymentMethod,
+    points_earned: pointsEarned,
+    points_used: usePoints ? pointsToUse : 0,
+    ordered_at: new Date().toISOString(),
+  }).select().single();
+
+  if (saleError) return { error: saleError.message };
+  const saleOrderId = (saleOrder as any).id;
+
+  // ③ 판매 항목 저장
+  for (const item of cart) {
+    await db.from('sales_order_items').insert({
+      sales_order_id: saleOrderId,
+      product_id: item.productId,
+      quantity: item.quantity,
+      unit_price: item.price,
+      discount_amount: 0,
+      total_price: item.price * item.quantity,
+    });
+  }
+
+  // ④ 재고 차감 + 이동 기록
+  const stockUpdates: Record<string, number> = {};
+  for (const item of cart) {
+    const { data: inv } = await supabase
+      .from('inventories').select('id, quantity')
+      .eq('branch_id', branchId).eq('product_id', item.productId).single();
+    const inv_ = inv as any;
+    await db.from('inventories').update({ quantity: inv_.quantity - item.quantity }).eq('id', inv_.id);
+    await db.from('inventory_movements').insert({
+      branch_id: branchId,
+      product_id: item.productId,
+      movement_type: 'OUT',
+      quantity: item.quantity,
+      reference_id: saleOrderId,
+      reference_type: 'POS_SALE',
+      memo: null,
+    });
+    stockUpdates[item.productId] = inv_.quantity - item.quantity;
+  }
+
+  // ⑤ 포인트 처리
+  if (customerId) {
+    const { data: lastHist } = await db.from('point_history').select('balance')
+      .eq('customer_id', customerId).order('created_at', { ascending: false }).limit(1).maybeSingle();
+    const currentPoints = lastHist?.balance || 0;
+
+    if (usePoints && pointsToUse > 0) {
+      const afterUse = currentPoints - pointsToUse;
+      await db.from('point_history').insert({
+        customer_id: customerId, sales_order_id: saleOrderId,
+        type: 'use', points: -pointsToUse, balance: afterUse,
+        description: `포인트 사용 (${orderNumber})`,
+      });
+      await db.from('point_history').insert({
+        customer_id: customerId, sales_order_id: saleOrderId,
+        type: 'earn', points: pointsEarned, balance: afterUse + pointsEarned,
+        description: `구매 적립 (${orderNumber})`,
+      });
+    } else {
+      await db.from('point_history').insert({
+        customer_id: customerId, sales_order_id: saleOrderId,
+        type: 'earn', points: pointsEarned, balance: currentPoints + pointsEarned,
+        description: `구매 적립 (${orderNumber})`,
+      });
+    }
+  }
+
+  return { orderNumber, pointsEarned, stockUpdates };
+}

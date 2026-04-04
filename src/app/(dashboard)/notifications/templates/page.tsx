@@ -37,7 +37,7 @@ export default function NotificationTemplatesPage() {
 
   return (
     <div className="card">
-      <div className="flex justify-between items-center mb-6">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4 sm:mb-6">
         <h3 className="font-semibold text-lg">알림톡 템플릿</h3>
         <button
           onClick={() => {
@@ -50,7 +50,8 @@ export default function NotificationTemplatesPage() {
         </button>
       </div>
 
-      <table className="table">
+      <div className="overflow-x-auto">
+      <table className="table min-w-[500px]">
         <thead>
           <tr>
             <th>템플릿 코드</th>
@@ -87,6 +88,7 @@ export default function NotificationTemplatesPage() {
           )}
         </tbody>
       </table>
+      </div>
 
       {showModal && (
         <TemplateModal
@@ -136,8 +138,8 @@ function TemplateModal({ template, onClose, onSuccess }: any) {
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg p-6 w-full max-w-lg">
+    <div className="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center z-50">
+      <div className="bg-white w-full max-w-lg mx-4 sm:mx-auto max-h-[90vh] overflow-y-auto rounded-t-xl sm:rounded-xl p-4 sm:p-6">
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-lg font-bold">{template?.id ? '템플릿 수정' : '템플릿 추가'}</h2>
           <button onClick={onClose} className="text-gray-500 hover:text-gray-700">✕</button>

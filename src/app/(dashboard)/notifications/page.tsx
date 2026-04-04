@@ -86,7 +86,7 @@ export default function NotificationsPage() {
       </div>
 
       {/* 통계 */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
         <div className="stat-card">
           <p className="text-sm text-slate-500">발송 완료</p>
           <p className="text-2xl font-bold text-green-600">{stats.sent}</p>
@@ -107,7 +107,7 @@ export default function NotificationsPage() {
 
       {/* 필터 + 테이블 */}
       <div className="card">
-        <div className="flex gap-3 mb-4 flex-wrap">
+        <div className="flex flex-col sm:flex-row gap-3 mb-4 flex-wrap">
           <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} className="input w-36 text-sm py-1.5">
             <option value="">전체 상태</option>
             <option value="sent">발송완료</option>
@@ -121,7 +121,8 @@ export default function NotificationsPage() {
           </select>
         </div>
 
-        <table className="table">
+        <div className="overflow-x-auto">
+        <table className="table min-w-[600px]">
           <thead>
             <tr>
               <th>발송일시</th>
@@ -161,6 +162,7 @@ export default function NotificationsPage() {
             ))}
           </tbody>
         </table>
+        </div>
       </div>
 
       {showSendModal && (
@@ -253,8 +255,8 @@ function SendModal({ type, templates, customers, onClose, onSuccess }: SendModal
 
   if (result) {
     return (
-      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-        <div className="bg-white rounded-lg p-8 w-full max-w-sm text-center shadow-xl">
+      <div className="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center z-50 p-4">
+        <div className="bg-white w-full max-w-sm mx-4 sm:mx-auto rounded-t-xl sm:rounded-xl p-6 sm:p-8 text-center shadow-xl">
           <div className="text-4xl mb-3">{result.failCount === 0 ? '✅' : '⚠️'}</div>
           <h3 className="text-lg font-bold mb-2">발송 완료</h3>
           <p className="text-slate-600 mb-1">성공 <span className="font-bold text-green-600">{result.successCount}건</span></p>
@@ -268,8 +270,8 @@ function SendModal({ type, templates, customers, onClose, onSuccess }: SendModal
   }
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg w-full max-w-2xl max-h-[90vh] overflow-auto shadow-xl">
+    <div className="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center z-50 p-4">
+      <div className="bg-white w-full max-w-lg mx-4 sm:mx-auto max-h-[90vh] overflow-y-auto rounded-t-xl sm:rounded-xl shadow-xl">
         <div className="flex justify-between items-center px-6 py-4 border-b sticky top-0 bg-white z-10">
           <h2 className="font-bold text-slate-800">
             {type === 'sms' ? 'SMS' : '알림톡'} 발송
@@ -328,7 +330,7 @@ function SendModal({ type, templates, customers, onClose, onSuccess }: SendModal
                 onChange={e => setCustomerSearch(e.target.value)}
                 className="input text-sm"
               />
-              <div className="border rounded-lg max-h-52 overflow-auto">
+              <div className="border rounded-lg max-h-40 sm:max-h-52 overflow-auto">
                 {filteredCustomers.map(c => (
                   <label key={c.id} className="flex items-center gap-3 px-3 py-2 hover:bg-slate-50 border-b border-slate-100 last:border-0 cursor-pointer">
                     <input type="checkbox" checked={selectedCustomerIds.includes(c.id)} onChange={() => toggleCustomer(c.id)} />

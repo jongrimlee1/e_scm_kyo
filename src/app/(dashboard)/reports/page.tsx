@@ -609,8 +609,9 @@ export default function ReportsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center flex-wrap gap-4">
-        <div className="flex gap-1 border-b border-slate-200">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4 sm:mb-6">
+        <div className="overflow-x-auto w-full sm:w-auto">
+        <div className="flex gap-1 border-b border-slate-200 whitespace-nowrap">
           {REPORT_TABS.map(t => (
             <button key={t.key} onClick={() => setReportTab(t.key)}
               className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px ${
@@ -618,7 +619,8 @@ export default function ReportsPage() {
               }`}>{t.label}</button>
           ))}
         </div>
-        <div className="flex gap-2 flex-wrap">
+        </div>
+        <div className="flex flex-wrap gap-2">
           <select
             value={period}
             onChange={(e) => handlePeriodChange(e.target.value as any)}
@@ -667,17 +669,17 @@ export default function ReportsPage() {
           </button>
           {reportTab === 'sales' && rawOrders.length > 0 && (
             <button onClick={exportSalesCSV} className="btn-secondary">
-              매출 CSV
+              <span className="hidden sm:inline">매출 </span>CSV
             </button>
           )}
           {reportTab === 'purchase' && purchaseData.length > 0 && (
             <button onClick={exportPurchaseCSV} className="btn-secondary">
-              매입 CSV
+              <span className="hidden sm:inline">매입 </span>CSV
             </button>
           )}
           {reportTab === 'purchase' && returnData.length > 0 && (
             <button onClick={exportReturnCSV} className="btn-secondary">
-              환불 CSV
+              <span className="hidden sm:inline">환불 </span>CSV
             </button>
           )}
           <button onClick={downloadPDF} className="btn-primary">
@@ -690,7 +692,7 @@ export default function ReportsPage() {
         <div className="text-center py-12 text-slate-400">로딩 중...</div>
       ) : reportTab === 'purchase' ? (
         <div className="space-y-4">
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4">
             <div className="card text-center">
               <p className="text-sm text-slate-500">발주 건수</p>
               <p className="text-2xl font-bold text-slate-800 mt-1">{purchaseData.length}건</p>
@@ -709,7 +711,7 @@ export default function ReportsPage() {
             {purchaseData.length === 0 ? (
               <p className="text-center text-slate-400 py-8">해당 기간 매입 데이터가 없습니다</p>
             ) : (
-              <table className="table">
+              <table className="table min-w-[500px]">
                 <thead>
                   <tr>
                     <th>발주일</th>
@@ -744,7 +746,7 @@ export default function ReportsPage() {
           {returnData.length > 0 && (
             <div className="card overflow-x-auto">
               <h3 className="font-semibold mb-4">환불 내역</h3>
-              <table className="table">
+              <table className="table min-w-[500px]">
                 <thead>
                   <tr>
                     <th>일자</th>
@@ -821,7 +823,7 @@ export default function ReportsPage() {
         <MarginTab data={marginData} loading={marginLoading} />
       ) : (
         <>
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4">
             <div className="stat-card">
               <p className="text-sm text-slate-500">총 매출 (정상가)</p>
               <p className="text-xl font-bold text-slate-800">{salesData.totalAmount.toLocaleString()}원</p>
@@ -963,7 +965,8 @@ export default function ReportsPage() {
           <div className="card">
             <h3 className="font-semibold mb-4">인기 제품 (판매금액 기준)</h3>
             {productSales.length > 0 ? (
-              <table className="table">
+              <div className="overflow-x-auto">
+              <table className="table min-w-[400px]">
                 <thead>
                   <tr>
                     <th>순위</th>
@@ -983,6 +986,7 @@ export default function ReportsPage() {
                   ))}
                 </tbody>
               </table>
+              </div>
             ) : (
               <p className="text-center text-slate-400 py-8">데이터가 없습니다</p>
             )}
@@ -1122,7 +1126,7 @@ function MarginTab({ data, loading }: { data: any[]; loading: boolean }) {
           </span>
         )}
       </div>
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
         {[
           { label: '총 매출',    value: `${totalRevenue.toLocaleString()}원`, color: 'text-slate-800' },
           { label: '총 원가',    value: `${totalCogs.toLocaleString()}원`,    color: 'text-amber-700' },

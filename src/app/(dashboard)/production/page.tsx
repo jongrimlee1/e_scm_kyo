@@ -115,12 +115,12 @@ export default function ProductionPage() {
   return (
     <div className="space-y-6">
       {/* 헤더 */}
-      <div className="flex flex-wrap items-center justify-between gap-4">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4 sm:mb-6">
         <div>
           <h1 className="text-xl font-bold text-slate-800">생산 관리</h1>
           <p className="text-sm text-slate-500">BOM 기반 생산 지시 및 재고 처리</p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           {!isBranchUser && (
             <select
               value={selectedBranch}
@@ -153,7 +153,7 @@ export default function ProductionPage() {
       {tab === 'orders' && (
         <>
           {/* 통계 */}
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
             <div className="stat-card">
               <p className="text-sm text-slate-500">대기</p>
               <p className="text-2xl font-bold text-slate-700">{stats.pending}</p>
@@ -189,8 +189,9 @@ export default function ProductionPage() {
           </div>
 
           {/* 목록 */}
-          <div className="card overflow-x-auto">
-            <table className="table">
+          <div className="card">
+            <div className="overflow-x-auto">
+            <table className="table min-w-[650px]">
               <thead>
                 <tr>
                   <th>지시번호</th>
@@ -243,13 +244,15 @@ export default function ProductionPage() {
                 ))}
               </tbody>
             </table>
+            </div>
           </div>
         </>
       )}
 
       {tab === 'bom' && (
-        <div className="card overflow-x-auto">
-          <table className="table">
+        <div className="card">
+          <div className="overflow-x-auto">
+          <table className="table min-w-[450px]">
             <thead>
               <tr>
                 <th>완제품</th>
@@ -286,6 +289,7 @@ export default function ProductionPage() {
               ))}
             </tbody>
           </table>
+          </div>
         </div>
       )}
 
@@ -353,13 +357,13 @@ function NewOrderModal({ products, branchId, branchName, onClose, onSuccess }: {
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg w-full max-w-lg shadow-xl">
+    <div className="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center z-50">
+      <div className="bg-white w-full max-w-lg mx-4 sm:mx-auto max-h-[90vh] overflow-y-auto rounded-t-xl sm:rounded-xl shadow-xl">
         <div className="flex justify-between items-center px-6 py-4 border-b">
           <h2 className="font-bold text-slate-800">생산 지시 등록</h2>
           <button onClick={onClose} className="text-slate-400 hover:text-slate-600 text-xl">✕</button>
         </div>
-        <div className="p-6 space-y-4">
+        <div className="p-4 sm:p-6 space-y-4">
           <div className="bg-slate-50 px-3 py-2 rounded text-sm text-slate-600">
             지점: <strong>{branchName}</strong>
           </div>
@@ -426,7 +430,7 @@ function NewOrderModal({ products, branchId, branchName, onClose, onSuccess }: {
             </div>
           )}
         </div>
-        <div className="flex gap-2 px-6 py-4 border-t">
+        <div className="flex gap-2 px-4 sm:px-6 py-4 border-t">
           <button
             onClick={handleSubmit}
             disabled={!productId || quantity < 1 || !canSubmit || submitting}
@@ -490,13 +494,13 @@ function BomModal({ products, bomList: initialBomList, onClose, onSuccess }: {
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg w-full max-w-lg shadow-xl max-h-[90vh] flex flex-col">
+    <div className="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center z-50">
+      <div className="bg-white w-full max-w-lg mx-4 sm:mx-auto max-h-[90vh] overflow-y-auto rounded-t-xl sm:rounded-xl shadow-xl flex flex-col">
         <div className="flex justify-between items-center px-6 py-4 border-b">
           <h2 className="font-bold text-slate-800">BOM 관리</h2>
           <button onClick={handleClose} className="text-slate-400 hover:text-slate-600 text-xl">✕</button>
         </div>
-        <div className="p-6 space-y-4 overflow-y-auto flex-1">
+        <div className="p-4 sm:p-6 space-y-4 overflow-y-auto flex-1">
           <div>
             <label className="block text-sm font-medium mb-1">완제품 *</label>
             <select value={productId} onChange={e => { setProductId(e.target.value); setMaterialId(''); }} className="input">
@@ -570,7 +574,7 @@ function BomModal({ products, bomList: initialBomList, onClose, onSuccess }: {
             </div>
           </div>
         </div>
-        <div className="px-6 py-4 border-t">
+        <div className="px-4 sm:px-6 py-4 border-t">
           <button onClick={handleClose} className="w-full btn-secondary">완료</button>
         </div>
       </div>

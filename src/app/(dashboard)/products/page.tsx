@@ -59,7 +59,7 @@ export default function ProductsPage() {
 
   return (
     <div className="card">
-      <div className="flex justify-between items-center mb-5">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4 sm:mb-6">
         <div>
           <h3 className="font-semibold text-lg">제품 목록</h3>
           <p className="text-sm text-slate-400 mt-0.5">{filtered.length}개</p>
@@ -69,13 +69,13 @@ export default function ProductsPage() {
         </button>
       </div>
 
-      <div className="flex gap-3 mb-4 flex-wrap items-center">
+      <div className="flex flex-col sm:flex-row gap-3 flex-wrap items-start sm:items-center mb-4">
         <input
           type="text"
           placeholder="제품명 / 코드 / 바코드 검색..."
           value={search}
           onChange={e => setSearch(e.target.value)}
-          className="input w-64"
+          className="input w-full sm:w-64"
         />
         <div className="flex rounded-lg border border-slate-200 overflow-hidden text-sm">
           {([['', '전체'], ['true', '활성'], ['false', '비활성']] as [string, string][]).map(([v, label]) => (
@@ -93,7 +93,7 @@ export default function ProductsPage() {
       </div>
 
       <div className="overflow-x-auto">
-        <table className="table">
+        <table className="table min-w-[750px]">
           <thead>
             <tr>
               <th>제품코드</th>

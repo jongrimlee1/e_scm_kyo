@@ -83,18 +83,18 @@ export default function AgentMemoryPage() {
 
   return (
     <div className="space-y-5">
-      <div className="flex justify-between items-start">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4 sm:mb-6">
         <div>
           <h1 className="text-xl font-bold text-slate-800">AI 에이전트 학습 메모리</h1>
           <p className="text-sm text-slate-500 mt-0.5">에이전트가 업무를 처리하며 자동으로 축적한 지식입니다. 비활성화하면 프롬프트에 주입되지 않습니다.</p>
         </div>
-        <button onClick={clearInactive} className="btn-secondary text-sm py-1.5 px-3 text-red-600">
+        <button onClick={clearInactive} className="btn-secondary text-sm py-1.5 px-3 text-red-600 shrink-0">
           비활성 전체 삭제
         </button>
       </div>
 
       {/* 통계 카드 */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-5 gap-3 sm:gap-4">
         <div className="card text-center py-3">
           <p className="text-xs text-slate-500">전체</p>
           <p className="text-2xl font-bold text-slate-800">{stats.total}</p>
@@ -112,7 +112,7 @@ export default function AgentMemoryPage() {
       </div>
 
       {/* 필터 */}
-      <div className="flex gap-3 flex-wrap">
+      <div className="flex flex-col sm:flex-row gap-3 flex-wrap">
         <select value={filter.type} onChange={e => setFilter(f => ({ ...f, type: e.target.value }))} className="input w-32 text-sm">
           <option value="">전체 유형</option>
           {Object.entries(TYPE_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}

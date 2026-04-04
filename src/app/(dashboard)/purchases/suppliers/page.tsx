@@ -60,7 +60,7 @@ export default function SuppliersPage() {
 
   return (
     <div className="space-y-5">
-      <div className="flex flex-col sm:flex-row justify-between gap-3">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4 sm:mb-6">
         <div className="flex items-center gap-3">
           <Link href="/purchases" className="text-sm text-slate-500 hover:text-slate-700">← 발주 목록</Link>
           <h1 className="text-lg font-bold text-slate-800">공급업체 관리</h1>
@@ -69,13 +69,13 @@ export default function SuppliersPage() {
       </div>
 
       <div className="card">
-        <div className="flex flex-wrap gap-3 mb-5">
+        <div className="flex flex-col sm:flex-row gap-3 flex-wrap mb-5">
           <input
             type="text"
             value={search}
             onChange={e => setSearch(e.target.value)}
             placeholder="업체명, 코드, 사업자번호 검색..."
-            className="input w-72"
+            className="input w-full sm:w-72"
           />
           <label className="flex items-center gap-2 text-sm text-slate-600 cursor-pointer">
             <input
@@ -90,7 +90,7 @@ export default function SuppliersPage() {
         </div>
 
         <div className="overflow-x-auto">
-          <table className="table">
+          <table className="table min-w-[700px]">
             <thead>
               <tr>
                 <th>코드</th>

@@ -96,7 +96,7 @@ export default function PurchaseOrderDetailPage() {
           <h1 className="text-lg font-bold text-slate-800 font-mono">{order.po_number}</h1>
           <span className={`badge ${STATUS_BADGE[order.status] || ''}`}>{STATUS_LABELS[order.status] || order.status}</span>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           {order.status === 'DRAFT' && (
             <button onClick={handleConfirm} disabled={actionLoading} className="btn-primary py-2 px-4 text-sm">발주 확정</button>
           )}
@@ -115,7 +115,7 @@ export default function PurchaseOrderDetailPage() {
           {/* 기본 정보 */}
           <div className="card">
             <h2 className="text-sm font-semibold text-slate-500 uppercase tracking-wide mb-4">발주 정보</h2>
-            <div className="grid grid-cols-2 gap-x-8 gap-y-3 text-sm">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
               <div>
                 <span className="text-slate-500">공급업체</span>
                 <p className="font-medium mt-0.5">{order.supplier?.name || '-'}</p>
@@ -159,7 +159,7 @@ export default function PurchaseOrderDetailPage() {
               </div>
             </div>
             <div className="overflow-x-auto">
-              <table className="table">
+              <table className="table min-w-[550px]">
                 <thead>
                   <tr>
                     <th>제품</th>

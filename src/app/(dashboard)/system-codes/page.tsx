@@ -264,13 +264,13 @@ export default function SystemCodesPage() {
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold">시스템 코드 관리</h1>
+        <h1 className="text-xl sm:text-2xl font-bold">시스템 코드 관리</h1>
       </div>
 
-      <div className="flex gap-2 border-b border-slate-200">
+      <div className="flex gap-1 border-b border-slate-200 overflow-x-auto">
         <button
           onClick={() => setActiveTab('channels')}
-          className={`px-4 py-2 font-medium border-b-2 -mb-px transition-colors ${
+          className={`px-3 py-2 text-sm font-medium border-b-2 -mb-px transition-colors whitespace-nowrap ${
             activeTab === 'channels'
               ? 'border-blue-500 text-blue-600'
               : 'border-transparent text-slate-500 hover:text-slate-700'
@@ -280,7 +280,7 @@ export default function SystemCodesPage() {
         </button>
         <button
           onClick={() => setActiveTab('branches')}
-          className={`px-4 py-2 font-medium border-b-2 -mb-px transition-colors ${
+          className={`px-3 py-2 text-sm font-medium border-b-2 -mb-px transition-colors whitespace-nowrap ${
             activeTab === 'branches'
               ? 'border-blue-500 text-blue-600'
               : 'border-transparent text-slate-500 hover:text-slate-700'
@@ -290,7 +290,7 @@ export default function SystemCodesPage() {
         </button>
         <button
           onClick={() => setActiveTab('grades')}
-          className={`px-4 py-2 font-medium border-b-2 -mb-px transition-colors ${
+          className={`px-3 py-2 text-sm font-medium border-b-2 -mb-px transition-colors whitespace-nowrap ${
             activeTab === 'grades'
               ? 'border-blue-500 text-blue-600'
               : 'border-transparent text-slate-500 hover:text-slate-700'
@@ -300,7 +300,7 @@ export default function SystemCodesPage() {
         </button>
         <button
           onClick={() => setActiveTab('tags')}
-          className={`px-4 py-2 font-medium border-b-2 -mb-px transition-colors ${
+          className={`px-3 py-2 text-sm font-medium border-b-2 -mb-px transition-colors whitespace-nowrap ${
             activeTab === 'tags'
               ? 'border-blue-500 text-blue-600'
               : 'border-transparent text-slate-500 hover:text-slate-700'
@@ -310,7 +310,7 @@ export default function SystemCodesPage() {
         </button>
         <button
           onClick={() => setActiveTab('categories')}
-          className={`px-4 py-2 font-medium border-b-2 -mb-px transition-colors ${
+          className={`px-3 py-2 text-sm font-medium border-b-2 -mb-px transition-colors whitespace-nowrap ${
             activeTab === 'categories'
               ? 'border-blue-500 text-blue-600'
               : 'border-transparent text-slate-500 hover:text-slate-700'
@@ -320,7 +320,7 @@ export default function SystemCodesPage() {
         </button>
         <button
           onClick={() => setActiveTab('staff')}
-          className={`px-4 py-2 font-medium border-b-2 -mb-px transition-colors ${
+          className={`px-3 py-2 text-sm font-medium border-b-2 -mb-px transition-colors whitespace-nowrap ${
             activeTab === 'staff'
               ? 'border-blue-500 text-blue-600'
               : 'border-transparent text-slate-500 hover:text-slate-700'
@@ -330,7 +330,7 @@ export default function SystemCodesPage() {
         </button>
         <button
           onClick={() => setActiveTab('templates')}
-          className={`px-4 py-2 font-medium border-b-2 -mb-px transition-colors ${
+          className={`px-3 py-2 text-sm font-medium border-b-2 -mb-px transition-colors whitespace-nowrap ${
             activeTab === 'templates'
               ? 'border-blue-500 text-blue-600'
               : 'border-transparent text-slate-500 hover:text-slate-700'
@@ -340,7 +340,7 @@ export default function SystemCodesPage() {
         </button>
         <button
           onClick={() => setActiveTab('permissions')}
-          className={`px-4 py-2 font-medium border-b-2 -mb-px transition-colors ${
+          className={`px-3 py-2 text-sm font-medium border-b-2 -mb-px transition-colors whitespace-nowrap ${
             activeTab === 'permissions'
               ? 'border-blue-500 text-blue-600'
               : 'border-transparent text-slate-500 hover:text-slate-700'
@@ -356,12 +356,13 @@ export default function SystemCodesPage() {
             <h3 className="font-semibold">채널 목록</h3>
             <button
               onClick={() => { setEditingChannel(null); setShowChannelModal(true); }}
-              className="btn-primary"
+              className="btn-primary text-sm"
             >
               + 채널 추가
             </button>
           </div>
 
+          <div className="overflow-x-auto -mx-4 sm:mx-0">
           <table className="table">
             <thead>
               <tr>
@@ -415,6 +416,7 @@ export default function SystemCodesPage() {
               )}
             </tbody>
           </table>
+          </div>
         </div>
       )}
 
@@ -423,13 +425,14 @@ export default function SystemCodesPage() {
           <div className="flex justify-between items-center mb-4">
             <h3 className="font-semibold">지점 목록</h3>
             <button
-              onClick={() => { console.log('지점 추가 clicked'); setEditingBranch(null); setShowBranchModal(true); }}
-              className="btn-primary"
+              onClick={() => { setEditingBranch(null); setShowBranchModal(true); }}
+              className="btn-primary text-sm"
             >
               + 지점 추가
             </button>
           </div>
 
+          <div className="overflow-x-auto -mx-4 sm:mx-0">
           <table className="table">
             <thead>
               <tr>
@@ -484,6 +487,7 @@ export default function SystemCodesPage() {
               )}
             </tbody>
           </table>
+          </div>
         </div>
       )}
 
@@ -493,12 +497,13 @@ export default function SystemCodesPage() {
             <h3 className="font-semibold">고객 등급 목록</h3>
             <button
               onClick={() => { setEditingGrade(null); setShowGradeModal(true); }}
-              className="btn-primary"
+              className="btn-primary text-sm"
             >
               + 등급 추가
             </button>
           </div>
 
+          <div className="overflow-x-auto -mx-4 sm:mx-0">
           <table className="table">
             <thead>
               <tr>
@@ -570,6 +575,7 @@ export default function SystemCodesPage() {
               )}
             </tbody>
           </table>
+          </div>
         </div>
       )}
 
@@ -579,12 +585,13 @@ export default function SystemCodesPage() {
             <h3 className="font-semibold">고객 태그 목록</h3>
             <button
               onClick={() => { setEditingTag(null); setShowTagModal(true); }}
-              className="btn-primary"
+              className="btn-primary text-sm"
             >
               + 태그 추가
             </button>
           </div>
 
+          <div className="overflow-x-auto -mx-4 sm:mx-0">
           <table className="table">
             <thead>
               <tr>
@@ -638,6 +645,7 @@ export default function SystemCodesPage() {
               )}
             </tbody>
           </table>
+          </div>
         </div>
       )}
 
@@ -647,12 +655,13 @@ export default function SystemCodesPage() {
             <h3 className="font-semibold">카테고리 목록</h3>
             <button
               onClick={() => { setEditingCategory(null); setShowCategoryModal(true); }}
-              className="btn-primary"
+              className="btn-primary text-sm"
             >
               + 카테고리 추가
             </button>
           </div>
 
+          <div className="overflow-x-auto -mx-4 sm:mx-0">
           <table className="table">
             <thead>
               <tr>
@@ -693,6 +702,7 @@ export default function SystemCodesPage() {
               )}
             </tbody>
           </table>
+          </div>
         </div>
       )}
 
@@ -702,12 +712,13 @@ export default function SystemCodesPage() {
             <h3 className="font-semibold">직원 목록</h3>
             <button
               onClick={() => { setEditingUser(null); setShowUserModal(true); }}
-              className="btn-primary"
+              className="btn-primary text-sm"
             >
               + 직원 추가
             </button>
           </div>
 
+          <div className="overflow-x-auto -mx-4 sm:mx-0">
           <table className="table">
             <thead>
               <tr>
@@ -760,6 +771,7 @@ export default function SystemCodesPage() {
               )}
             </tbody>
           </table>
+          </div>
         </div>
       )}
 
@@ -769,12 +781,13 @@ export default function SystemCodesPage() {
             <h3 className="font-semibold">알림톡 템플릿 목록</h3>
             <button
               onClick={() => { setEditingTemplate(null); setShowTemplateModal(true); }}
-              className="btn-primary"
+              className="btn-primary text-sm"
             >
               + 템플릿 추가
             </button>
           </div>
 
+          <div className="overflow-x-auto -mx-4 sm:mx-0">
           <table className="table">
             <thead>
               <tr>
@@ -815,6 +828,7 @@ export default function SystemCodesPage() {
               )}
             </tbody>
           </table>
+          </div>
         </div>
       )}
 
@@ -827,6 +841,7 @@ export default function SystemCodesPage() {
             </p>
           </div>
 
+          <div className="overflow-x-auto -mx-4 sm:mx-0">
           <table className="table">
             <thead>
               <tr>
@@ -872,6 +887,7 @@ export default function SystemCodesPage() {
               ))}
             </tbody>
           </table>
+          </div>
         </div>
       )}
 
@@ -885,7 +901,6 @@ export default function SystemCodesPage() {
 
       {showBranchModal && (
         <>
-          {console.log('Rendering BranchModal, showBranchModal:', showBranchModal, 'editingBranch:', editingBranch)}
           <BranchModal
             branch={editingBranch}
             channels={channels}
@@ -987,8 +1002,8 @@ function ChannelModal({ channel, onClose, onSuccess }: { channel: Channel | null
   const presetColors = ['#6366f1', '#8b5cf6', '#ec4899', '#ef4444', '#f59e0b', '#10b981', '#06b6d4', '#f97316'];
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg p-6 w-full max-w-md">
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-lg p-6 w-full max-w-md max-h-[90vh] overflow-y-auto">
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-lg font-bold">{channel ? '채널 수정' : '채널 추가'}</h2>
           <button onClick={onClose} className="text-gray-500 hover:text-gray-700">✕</button>
@@ -1124,8 +1139,8 @@ function BranchModal({ branch, channels, onClose, onSuccess }: { branch: Branch 
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg p-6 w-full max-w-md">
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-lg p-6 w-full max-w-md max-h-[90vh] overflow-y-auto">
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-lg font-bold">{branch ? '지점 수정' : '지점 추가'}</h2>
           <button onClick={onClose} className="text-gray-500 hover:text-gray-700">✕</button>
@@ -1267,8 +1282,8 @@ function GradeModal({ grade, onClose, onSuccess }: { grade: CustomerGrade | null
   const presetColors = ['#6366f1', '#8b5cf6', '#ec4899', '#ef4444', '#f59e0b', '#10b981', '#06b6d4', '#94a3b8'];
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg p-6 w-full max-w-md">
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-lg p-6 w-full max-w-md max-h-[90vh] overflow-y-auto">
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-lg font-bold">{grade ? '등급 수정' : '등급 추가'}</h2>
           <button onClick={onClose} className="text-gray-500 hover:text-gray-700">✕</button>
@@ -1444,8 +1459,8 @@ function TagModal({ tag, onClose, onSuccess }: { tag: CustomerTag | null; onClos
   const presetColors = ['#6366f1', '#8b5cf6', '#ec4899', '#ef4444', '#f59e0b', '#10b981', '#06b6d4', '#84cc16', '#f97316'];
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg p-6 w-full max-w-md">
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-lg p-6 w-full max-w-md max-h-[90vh] overflow-y-auto">
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-lg font-bold">{tag ? '태그 수정' : '태그 추가'}</h2>
           <button onClick={onClose} className="text-gray-500 hover:text-gray-700">✕</button>
@@ -1567,8 +1582,8 @@ function CategoryModal({
   const parentCategories = categories.filter((c) => c.id !== category?.id);
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg p-6 w-full max-w-md">
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-lg p-6 w-full max-w-md max-h-[90vh] overflow-y-auto">
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-lg font-bold">{category ? '카테고리 수정' : '카테고리 추가'}</h2>
           <button onClick={onClose} className="text-gray-500 hover:text-gray-700">✕</button>
@@ -1723,8 +1738,8 @@ function UserModal({
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg p-6 w-full max-w-md">
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-lg p-6 w-full max-w-md max-h-[90vh] overflow-y-auto">
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-lg font-bold">{user ? '직원 수정' : '직원 추가'}</h2>
           <button onClick={onClose} className="text-gray-500 hover:text-gray-700">✕</button>
@@ -1915,7 +1930,7 @@ function TemplateModal({ template, onClose, onSuccess }: { template: Notificatio
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg p-6 w-full max-w-lg">
+      <div className="bg-white rounded-lg p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto">
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-lg font-bold">{template?.id ? '템플릿 수정' : '템플릿 추가'}</h2>
           <button onClick={onClose} className="text-gray-500 hover:text-gray-700">✕</button>

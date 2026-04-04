@@ -164,7 +164,8 @@ export default function AccountingPage() {
   return (
     <div className="space-y-5">
       {/* 탭 */}
-      <div className="flex gap-1 border-b border-slate-200">
+      <div className="overflow-x-auto">
+      <div className="flex gap-1 border-b border-slate-200 whitespace-nowrap">
         {TABS.map(t => (
           <button
             key={t.key}
@@ -177,11 +178,12 @@ export default function AccountingPage() {
           </button>
         ))}
       </div>
+      </div>
 
       {/* ── 손익계산서 ── */}
       {tab === 'pl' && (
         <div className="space-y-5">
-          <div className="flex flex-wrap gap-3 items-center">
+          <div className="flex flex-col sm:flex-row gap-3 flex-wrap items-start sm:items-center">
             <input type="date" value={plRange.start} onChange={e => setPlRange(r => ({ ...r, start: e.target.value }))} className="input w-36" />
             <span className="text-slate-400">~</span>
             <input type="date" value={plRange.end} onChange={e => setPlRange(r => ({ ...r, end: e.target.value }))} className="input w-36" />
@@ -261,7 +263,7 @@ export default function AccountingPage() {
       {/* ── 분개장 ── */}
       {tab === 'journal' && (
         <div className="space-y-4">
-          <div className="flex flex-wrap gap-3">
+          <div className="flex flex-col sm:flex-row gap-3 flex-wrap">
             <input type="date" value={journalRange.start} onChange={e => setJournalRange(r => ({ ...r, start: e.target.value }))} className="input w-36" />
             <span className="text-slate-400 self-center">~</span>
             <input type="date" value={journalRange.end} onChange={e => setJournalRange(r => ({ ...r, end: e.target.value }))} className="input w-36" />
@@ -304,7 +306,8 @@ export default function AccountingPage() {
                       </button>
                       {expanded && (
                         <div className="border-t bg-slate-50 px-4 py-3">
-                          <table className="table text-sm w-full">
+                          <div className="overflow-x-auto">
+                          <table className="table text-sm w-full min-w-[400px]">
                             <thead>
                               <tr>
                                 <th>계정</th>
@@ -335,6 +338,7 @@ export default function AccountingPage() {
                               </tr>
                             </tfoot>
                           </table>
+                          </div>
                         </div>
                       )}
                     </div>
@@ -349,7 +353,7 @@ export default function AccountingPage() {
       {/* ── 총계정원장 ── */}
       {tab === 'ledger' && (
         <div className="space-y-4">
-          <div className="flex flex-wrap gap-3">
+          <div className="flex flex-col sm:flex-row gap-3 flex-wrap">
             <select value={ledgerAccount} onChange={e => setLedgerAccount(e.target.value)} className="input w-56">
               <option value="">계정 선택</option>
               {accounts.map((a: any) => (
@@ -371,7 +375,7 @@ export default function AccountingPage() {
               ) : ledgerRows.length === 0 ? (
                 <div className="text-center py-10 text-slate-400">해당 계정의 거래 내역이 없습니다</div>
               ) : (
-                <table className="table">
+                <table className="table min-w-[500px]">
                   <thead>
                     <tr>
                       <th>일자</th>
@@ -427,7 +431,7 @@ export default function AccountingPage() {
               <div className="p-3 bg-red-50 text-red-600 rounded-lg text-sm">{manualError}</div>
             )}
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">전표 일자</label>
                 <input type="date" value={manualDate} onChange={e => setManualDate(e.target.value)} className="input" required />
@@ -438,8 +442,8 @@ export default function AccountingPage() {
               </div>
             </div>
 
-            <div className="border rounded-lg overflow-hidden">
-              <table className="table">
+            <div className="border rounded-lg overflow-hidden overflow-x-auto">
+              <table className="table min-w-[500px]">
                 <thead>
                   <tr>
                     <th>계정과목</th>

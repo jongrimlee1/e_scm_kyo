@@ -55,7 +55,7 @@ export default function BranchesPage() {
 
   return (
     <div className="card">
-      <div className="flex justify-between items-center mb-6">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4 sm:mb-6">
         <h3 className="font-semibold text-lg">지점 목록</h3>
         <button
           onClick={() => { setEditingBranch(null); setShowModal(true); }}
@@ -68,7 +68,8 @@ export default function BranchesPage() {
       {loading ? (
         <div className="text-center py-8 text-slate-400">불러오는 중...</div>
       ) : (
-        <table className="table">
+        <div className="overflow-x-auto">
+        <table className="table min-w-[600px]">
           <thead>
             <tr>
               <th>지점코드</th>
@@ -122,6 +123,7 @@ export default function BranchesPage() {
             )}
           </tbody>
         </table>
+        </div>
       )}
 
       {showModal && (
@@ -185,8 +187,8 @@ function BranchModal({ branch, onClose, onSuccess }: { branch: Branch | null; on
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg p-6 w-full max-w-md">
+    <div className="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center z-50">
+      <div className="bg-white w-full max-w-lg mx-4 sm:mx-auto max-h-[90vh] overflow-y-auto rounded-t-xl sm:rounded-xl p-4 sm:p-6">
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-lg font-bold">{branch ? '지점 수정' : '지점 추가'}</h2>
           <button onClick={onClose} className="text-gray-500 hover:text-gray-700">✕</button>

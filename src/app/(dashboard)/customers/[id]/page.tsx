@@ -299,7 +299,7 @@ export default function CustomerDetailPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4 sm:mb-6">
         <div className="flex items-center gap-4">
           <Link href="/customers" className="text-slate-400 hover:text-slate-600">
             ← 목록
@@ -430,10 +430,10 @@ export default function CustomerDetailPage() {
         </div>
 
         <div className="lg:col-span-2">
-          <div className="flex gap-2 border-b border-slate-200 mb-4">
+          <div className="flex overflow-x-auto gap-1 border-b border-slate-200 mb-4">
             <button
               onClick={() => setActiveTab('info')}
-              className={`px-4 py-2 font-medium border-b-2 -mb-px ${
+              className={`px-4 py-2 font-medium border-b-2 -mb-px whitespace-nowrap ${
                 activeTab === 'info'
                   ? 'border-blue-500 text-blue-600'
                   : 'border-transparent text-slate-500'
@@ -443,7 +443,7 @@ export default function CustomerDetailPage() {
             </button>
             <button
               onClick={() => setActiveTab('purchases')}
-              className={`px-4 py-2 font-medium border-b-2 -mb-px ${
+              className={`px-4 py-2 font-medium border-b-2 -mb-px whitespace-nowrap ${
                 activeTab === 'purchases'
                   ? 'border-blue-500 text-blue-600'
                   : 'border-transparent text-slate-500'
@@ -453,7 +453,7 @@ export default function CustomerDetailPage() {
             </button>
             <button
               onClick={() => setActiveTab('consultations')}
-              className={`px-4 py-2 font-medium border-b-2 -mb-px ${
+              className={`px-4 py-2 font-medium border-b-2 -mb-px whitespace-nowrap ${
                 activeTab === 'consultations'
                   ? 'border-blue-500 text-blue-600'
                   : 'border-transparent text-slate-500'
@@ -465,51 +465,53 @@ export default function CustomerDetailPage() {
 
           {activeTab === 'purchases' && (
             <div className="space-y-4">
-              <div className="flex gap-2 items-center flex-wrap">
-                <input
-                  type="date"
-                  value={purchaseDateRange.start}
-                  onChange={(e) => handleDateFilterChange('purchase', 'start', e.target.value)}
-                  className="input w-36"
-                />
-                <span className="text-slate-400">~</span>
-                <input
-                  type="date"
-                  value={purchaseDateRange.end}
-                  onChange={(e) => handleDateFilterChange('purchase', 'end', e.target.value)}
-                  className="input w-36"
-                />
-                <input
-                  type="text"
-                  placeholder="제품명 검색"
-                  value={purchaseProductSearch}
-                  onChange={(e) => setPurchaseProductSearch(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && fetchData()}
-                  className="input w-36"
-                />
-                <select
-                  value={purchaseBranchFilter}
-                  onChange={(e) => setPurchaseBranchFilter(e.target.value)}
-                  className="input w-36"
-                >
-                  <option value="">전체 지점</option>
-                  {branches.map(b => (
-                    <option key={b.id} value={b.id}>{b.name}</option>
-                  ))}
-                </select>
-                <button onClick={() => fetchData()} className="btn-secondary">조회</button>
-                <button
-                  onClick={() => {
-                    const range = getDefaultDateRange();
-                    setPurchaseDateRange(range);
-                    setPurchaseProductSearch('');
-                    setPurchaseBranchFilter('');
-                    setTimeout(() => fetchData(), 0);
-                  }}
-                  className="text-sm text-slate-500 hover:text-slate-700"
-                >
-                  초기화
-                </button>
+              <div className="flex flex-col sm:flex-row gap-3 flex-wrap">
+                <div className="flex flex-wrap gap-2 items-center">
+                  <input
+                    type="date"
+                    value={purchaseDateRange.start}
+                    onChange={(e) => handleDateFilterChange('purchase', 'start', e.target.value)}
+                    className="input w-36"
+                  />
+                  <span className="text-slate-400">~</span>
+                  <input
+                    type="date"
+                    value={purchaseDateRange.end}
+                    onChange={(e) => handleDateFilterChange('purchase', 'end', e.target.value)}
+                    className="input w-36"
+                  />
+                  <input
+                    type="text"
+                    placeholder="제품명 검색"
+                    value={purchaseProductSearch}
+                    onChange={(e) => setPurchaseProductSearch(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && fetchData()}
+                    className="input w-36"
+                  />
+                  <select
+                    value={purchaseBranchFilter}
+                    onChange={(e) => setPurchaseBranchFilter(e.target.value)}
+                    className="input w-36"
+                  >
+                    <option value="">전체 지점</option>
+                    {branches.map(b => (
+                      <option key={b.id} value={b.id}>{b.name}</option>
+                    ))}
+                  </select>
+                  <button onClick={() => fetchData()} className="btn-secondary">조회</button>
+                  <button
+                    onClick={() => {
+                      const range = getDefaultDateRange();
+                      setPurchaseDateRange(range);
+                      setPurchaseProductSearch('');
+                      setPurchaseBranchFilter('');
+                      setTimeout(() => fetchData(), 0);
+                    }}
+                    className="text-sm text-slate-500 hover:text-slate-700"
+                  >
+                    초기화
+                  </button>
+                </div>
               </div>
 
               {purchaseOrders.length === 0 ? (
@@ -560,7 +562,8 @@ export default function CustomerDetailPage() {
                         </button>
                         {isExpanded && (
                           <div className="border-t bg-slate-50 px-4 py-3">
-                            <table className="table text-sm">
+                            <div className="overflow-x-auto">
+                            <table className="table text-sm min-w-[400px]">
                               <thead>
                                 <tr>
                                   <th>제품</th>
@@ -580,6 +583,7 @@ export default function CustomerDetailPage() {
                                 ))}
                               </tbody>
                             </table>
+                            </div>
                             <div className="flex flex-wrap gap-3 mt-2 text-xs text-slate-500">
                               {order.payment_method && (
                                 <span>결제: {PAYMENT_LABELS[order.payment_method] || order.payment_method}</span>
@@ -603,33 +607,35 @@ export default function CustomerDetailPage() {
 
           {activeTab === 'consultations' && (
             <div className="space-y-4">
-              <div className="flex gap-2 items-center flex-wrap">
-                <input
-                  type="date"
-                  value={consultDateRange.start}
-                  onChange={(e) => handleDateFilterChange('consult', 'start', e.target.value)}
-                  className="input w-36"
-                />
-                <span className="text-slate-400">~</span>
-                <input
-                  type="date"
-                  value={consultDateRange.end}
-                  onChange={(e) => handleDateFilterChange('consult', 'end', e.target.value)}
-                  className="input w-36"
-                />
-                <button onClick={() => applyDateFilter('consult')} className="btn-secondary">
-                  조회
-                </button>
-                <button 
-                  onClick={() => {
-                    const range = getDefaultDateRange();
-                    setConsultDateRange(range);
-                    setTimeout(() => fetchData(), 0);
-                  }}
-                  className="text-sm text-slate-500 hover:text-slate-700"
-                >
-                  초기화
-                </button>
+              <div className="flex flex-col sm:flex-row gap-3 flex-wrap">
+                <div className="flex flex-wrap gap-2 items-center">
+                  <input
+                    type="date"
+                    value={consultDateRange.start}
+                    onChange={(e) => handleDateFilterChange('consult', 'start', e.target.value)}
+                    className="input w-36"
+                  />
+                  <span className="text-slate-400">~</span>
+                  <input
+                    type="date"
+                    value={consultDateRange.end}
+                    onChange={(e) => handleDateFilterChange('consult', 'end', e.target.value)}
+                    className="input w-36"
+                  />
+                  <button onClick={() => applyDateFilter('consult')} className="btn-secondary">
+                    조회
+                  </button>
+                  <button
+                    onClick={() => {
+                      const range = getDefaultDateRange();
+                      setConsultDateRange(range);
+                      setTimeout(() => fetchData(), 0);
+                    }}
+                    className="text-sm text-slate-500 hover:text-slate-700"
+                  >
+                    초기화
+                  </button>
+                </div>
               </div>
 
               <button
@@ -711,8 +717,8 @@ function ConsultModal({ onClose, onSubmit }: { onClose: () => void; onSubmit: (t
   const types = ['전화 상담', '방문 상담', '구매 상담', '민원 처리', '기타'];
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg p-6 w-full max-w-md">
+    <div className="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center z-50">
+      <div className="bg-white w-full max-w-lg mx-4 sm:mx-auto max-h-[90vh] overflow-y-auto rounded-t-xl sm:rounded-xl p-4 sm:p-6">
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-lg font-bold">상담 기록 추가</h2>
           <button onClick={onClose} className="text-gray-500 hover:text-gray-700">✕</button>
@@ -759,8 +765,8 @@ function AssignModal({
   onSubmit: (userId: string | null) => void;
 }) {
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg p-6 w-full max-w-md">
+    <div className="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center z-50">
+      <div className="bg-white w-full max-w-lg mx-4 sm:mx-auto max-h-[90vh] overflow-y-auto rounded-t-xl sm:rounded-xl p-4 sm:p-6">
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-lg font-bold">담당자 지정</h2>
           <button onClick={onClose} className="text-gray-500 hover:text-gray-700">✕</button>

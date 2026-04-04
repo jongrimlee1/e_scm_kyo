@@ -124,14 +124,14 @@ export default function CustomerAnalyticsPage() {
       </div>
 
       {/* 탭 */}
-      <div className="flex gap-1 border-b border-slate-200">
+      <div className="flex overflow-x-auto gap-1 border-b border-slate-200">
         {([
           { key: 'rfm',   label: 'RFM 세그멘테이션' },
           { key: 'cycle', label: '재구매 주기' },
           { key: 'churn', label: '이탈 위험 고객' },
         ] as const).map(t => (
           <button key={t.key} onClick={() => setTab(t.key)}
-            className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
+            className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors whitespace-nowrap ${
               tab === t.key ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-500 hover:text-slate-700'
             }`}>
             {t.label}
@@ -147,7 +147,7 @@ export default function CustomerAnalyticsPage() {
         rfmLoading ? <div className="text-center py-16 text-slate-400">분석 중...</div> : (
           <div className="space-y-6">
             {/* 세그먼트 카드 */}
-            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
+            <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2 sm:gap-3">
               {segmentSummary.map((s: any) => (
                 <button
                   key={s.segment}
@@ -176,7 +176,7 @@ export default function CustomerAnalyticsPage() {
 
             {/* 고객 테이블 */}
             <div className="card overflow-x-auto">
-              <table className="table text-sm">
+              <table className="table text-sm min-w-[700px]">
                 <thead>
                   <tr>
                     <th>고객명</th>
@@ -266,14 +266,14 @@ export default function CustomerAnalyticsPage() {
               <div className="space-y-3">
                 {(cycleData.distribution || []).map((d: any) => (
                   <div key={d.label} className="flex items-center gap-3">
-                    <span className="text-sm text-slate-600 w-24 shrink-0">{d.label}</span>
+                    <span className="text-xs sm:text-sm text-slate-600 w-20 sm:w-24 shrink-0">{d.label}</span>
                     <div className="flex-1 bg-slate-100 rounded-full h-5 relative">
                       <div
                         className="bg-blue-400 h-5 rounded-full transition-all"
                         style={{ width: `${maxCycleCount > 0 ? Math.round(d.count / maxCycleCount * 100) : 0}%` }}
                       />
                     </div>
-                    <span className="text-sm font-medium text-slate-700 w-12 text-right">{d.count}건</span>
+                    <span className="text-xs sm:text-sm font-medium text-slate-700 w-10 sm:w-12 text-right">{d.count}건</span>
                   </div>
                 ))}
               </div>
@@ -281,9 +281,9 @@ export default function CustomerAnalyticsPage() {
 
             {/* 짧은 주기 고객 */}
             {cycleData.topShortCycle?.length > 0 && (
-              <div className="card">
+              <div className="card overflow-x-auto">
                 <h3 className="font-semibold mb-4">재구매 주기가 짧은 고객 Top 10</h3>
-                <table className="table text-sm">
+                <table className="table text-sm min-w-[400px]">
                   <thead><tr>
                     <th>순위</th>
                     <th>고객</th>
@@ -323,7 +323,7 @@ export default function CustomerAnalyticsPage() {
               <div className="card text-center py-12 text-slate-400">이탈 위험 고객이 없습니다</div>
             ) : (
               <div className="card overflow-x-auto">
-                <table className="table text-sm">
+                <table className="table text-sm min-w-[600px]">
                   <thead><tr>
                     <th>고객명</th>
                     <th>연락처</th>

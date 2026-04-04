@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { createClient } from '@/lib/supabase/client';
+import { processPosCheckout } from '@/lib/actions';
 import RefundModal from './RefundModal';
 import ReceiptModal from './ReceiptModal';
 
@@ -276,117 +277,50 @@ export default function POSPage() {
     }
 
     setProcessing(true);
-    const supabase = createClient();
-    const db = supabase as any;
+    const selectedBranchData = branches.find(b => b.id === selectedBranch);
 
     try {
-      // ① 재고 사전 확인 (전체)
-      for (const item of cart) {
-        const { data: inv } = await supabase
-          .from('inventories').select('id, quantity')
-          .eq('branch_id', selectedBranch).eq('product_id', item.productId).single();
-        if (!inv || (inv as any).quantity < item.quantity) {
-          alert(`"${item.name}" 재고 부족 (현재: ${(inv as any)?.quantity ?? 0}개, 요청: ${item.quantity}개)`);
-          setProcessing(false);
-          return;
-        }
+      const result = await processPosCheckout({
+        branchId: selectedBranch,
+        branchCode: selectedBranchData?.code || 'ETC',
+        branchName: selectedBranchData?.name || '',
+        branchChannel: selectedBranchData?.channel || 'STORE',
+        customerId: selectedCustomer?.id || null,
+        gradePointRate: selectedCustomer?.grade_point_rate || 1.0,
+        cart,
+        totalAmount: total,
+        discountAmount: usePoints ? pointsToUse : 0,
+        finalAmount,
+        paymentMethod,
+        usePoints,
+        pointsToUse,
+        cashReceived: cashReceivedNum > 0 ? cashReceivedNum : undefined,
+        userId: getCookie('user_id'),
+      });
+
+      if (result.error) {
+        alert(result.error);
+        setProcessing(false);
+        return;
       }
 
-      // ② 판매 전표 생성
-      const today = new Date().toISOString().slice(0, 10).replace(/-/g, '');
-      const branchCode = branches.find(b => b.id === selectedBranch)?.code || 'ETC';
-      const randomSuffix = Math.random().toString(36).substring(2, 6).toUpperCase();
-      const orderNumber = `SA-${branchCode}-${today}-${randomSuffix}`;
+      const { orderNumber, pointsEarned, stockUpdates } = result;
 
-      const pointsEarned = selectedCustomer
-        ? Math.floor(finalAmount * (selectedCustomer.grade_point_rate || 1.0) / 100)
-        : 0;
-
-      const { data: saleOrder, error: saleError } = await db.from('sales_orders').insert({
-        order_number: orderNumber,
-        channel: branches.find(b => b.id === selectedBranch)?.channel || 'STORE',
-        branch_id: selectedBranch,
-        customer_id: selectedCustomer?.id || null,
-        ordered_by: getCookie('user_id') || null,
-        total_amount: total,
-        discount_amount: usePoints ? pointsToUse : 0,
-        status: 'COMPLETED',
-        payment_method: paymentMethod,
-        points_earned: pointsEarned,
-        points_used: usePoints ? pointsToUse : 0,
-        ordered_at: new Date().toISOString(),
-      }).select().single();
-
-      if (saleError) throw saleError;
-      const saleOrderId = (saleOrder as any).id;
-
-      // ③ 판매 항목 저장
-      for (const item of cart) {
-        await db.from('sales_order_items').insert({
-          sales_order_id: saleOrderId,
-          product_id: item.productId,
-          quantity: item.quantity,
-          unit_price: item.price,
-          discount_amount: 0,
-          total_price: item.price * item.quantity,
-        });
-      }
-
-      // ④ 재고 차감 (사전 확인 통과 후이므로 롤백 없이 진행)
-      for (const item of cart) {
-        const { data: inv } = await supabase
-          .from('inventories').select('id, quantity')
-          .eq('branch_id', selectedBranch).eq('product_id', item.productId).single();
-        const inv_ = inv as any;
-        await db.from('inventories').update({ quantity: inv_.quantity - item.quantity }).eq('id', inv_.id);
-        await db.from('inventory_movements').insert({
-          branch_id: selectedBranch,
-          product_id: item.productId,
-          movement_type: 'OUT',
-          quantity: item.quantity,
-          reference_id: saleOrderId,
-          reference_type: 'POS_SALE',
-          memo: null,
-        });
-        // 로컬 재고 맵 즉시 업데이트
-        const key = `${selectedBranch}_${item.productId}`;
-        setInventoryMap(prev => new Map(prev).set(key, (prev.get(key) ?? 0) - item.quantity));
-      }
-
-      // ⑤ 포인트 처리
-      if (selectedCustomer) {
-        const { data: lastHist } = await db.from('point_history').select('balance')
-          .eq('customer_id', selectedCustomer.id).order('created_at', { ascending: false }).limit(1).maybeSingle();
-        const currentPoints = lastHist?.balance || 0;
-
-        if (usePoints && pointsToUse > 0) {
-          const afterUse = currentPoints - pointsToUse;
-          await db.from('point_history').insert({
-            customer_id: selectedCustomer.id, sales_order_id: saleOrderId,
-            type: 'use', points: -pointsToUse, balance: afterUse,
-            description: `포인트 사용 (${orderNumber})`,
-          });
-          await db.from('point_history').insert({
-            customer_id: selectedCustomer.id, sales_order_id: saleOrderId,
-            type: 'earn', points: pointsEarned, balance: afterUse + pointsEarned,
-            description: `구매 적립 (${orderNumber})`,
-          });
-        } else {
-          await db.from('point_history').insert({
-            customer_id: selectedCustomer.id, sales_order_id: saleOrderId,
-            type: 'earn', points: pointsEarned, balance: currentPoints + pointsEarned,
-            description: `구매 적립 (${orderNumber})`,
-          });
+      // 로컬 재고 맵 즉시 업데이트
+      if (stockUpdates) {
+        for (const [productId, newQty] of Object.entries(stockUpdates)) {
+          const key = `${selectedBranch}_${productId}`;
+          setInventoryMap(prev => new Map(prev).set(key, newQty));
         }
       }
 
       // 영수증 표시
       setReceiptData({
-        orderNumber, branchName: branches.find(b => b.id === selectedBranch)?.name || '',
+        orderNumber: orderNumber!, branchName: selectedBranchData?.name || '',
         customerName: selectedCustomer?.name,
         items: cart.map(item => ({ name: item.name, quantity: item.quantity, unitPrice: item.price, totalPrice: item.price * item.quantity })),
         totalAmount: total, discountAmount: usePoints ? pointsToUse : 0,
-        finalAmount, pointsUsed: usePoints ? pointsToUse : 0, pointsEarned,
+        finalAmount, pointsUsed: usePoints ? pointsToUse : 0, pointsEarned: pointsEarned || 0,
         paymentMethod, cashReceived: paymentMethod === 'cash' && cashReceivedNum > 0 ? cashReceivedNum : undefined,
         change: paymentMethod === 'cash' && change > 0 ? change : undefined,
         orderedAt: new Date().toISOString(),

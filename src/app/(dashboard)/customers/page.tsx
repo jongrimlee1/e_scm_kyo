@@ -103,9 +103,9 @@ export default function CustomersPage() {
 
   return (
     <div className="card">
-      <div className="flex justify-between items-center mb-6">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4 sm:mb-6">
         <h3 className="font-semibold text-lg">고객 목록</h3>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <Link href="/customers/analytics" className="btn-secondary py-2 px-4 text-sm">
             고객 분석
           </Link>
@@ -129,7 +129,7 @@ export default function CustomersPage() {
         </div>
       </div>
 
-      <div className="flex gap-4 mb-4">
+      <div className="flex flex-col sm:flex-row gap-3 flex-wrap mb-4">
         <input
           type="text"
           placeholder="이름 또는 연락처 검색..."
@@ -140,7 +140,7 @@ export default function CustomersPage() {
         <select
           value={gradeFilter}
           onChange={(e) => setGradeFilter(e.target.value)}
-          className="input w-40"
+          className="input w-full sm:w-40"
         >
           <option value="">전체 등급</option>
           <option value="NORMAL">일반</option>
@@ -149,7 +149,8 @@ export default function CustomersPage() {
         </select>
       </div>
 
-      <table className="table">
+      <div className="overflow-x-auto">
+      <table className="table min-w-[600px]">
         <thead>
           <tr>
             <th>이름</th>
@@ -209,6 +210,7 @@ export default function CustomersPage() {
           )}
         </tbody>
       </table>
+      </div>
 
       {showModal && (
         <CustomerModal
