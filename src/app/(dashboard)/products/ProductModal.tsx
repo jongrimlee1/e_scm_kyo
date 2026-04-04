@@ -53,12 +53,6 @@ export default function ProductModal({ product, onClose, onSuccess }: Props) {
     const errors: Record<string, string> = {};
     const nameError = validators.required(formData.name, '제품명');
     if (nameError) errors.name = nameError;
-    const codeError = validators.required(formData.code, '제품코드');
-    if (codeError) errors.code = codeError;
-    else {
-      const codeFormatError = validators.code(formData.code);
-      if (codeFormatError) errors.code = codeFormatError;
-    }
     const priceError = validators.positiveInteger(formData.price, '판매가');
     if (priceError) errors.price = priceError;
     if (formData.cost !== null) {
@@ -134,23 +128,18 @@ export default function ProductModal({ product, onClose, onSuccess }: Props) {
             )}
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700">제품코드 *</label>
-            <input
-              type="text"
-              value={formData.code}
-              onChange={(e) => {
-                setFormData({ ...formData, code: e.target.value });
-                setFieldErrors({ ...fieldErrors, code: '' });
-              }}
-              required
-              placeholder="P-00001"
-              className={`mt-1 input ${fieldErrors.code ? 'border-red-500' : ''}`}
-            />
-            {fieldErrors.code && (
-              <p className="mt-1 text-xs text-red-500">{fieldErrors.code}</p>
-            )}
-          </div>
+          {product?.id && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700">제품코드</label>
+              <input
+                type="text"
+                value={formData.code}
+                readOnly
+                className="mt-1 input bg-slate-50 text-slate-500 cursor-default"
+              />
+              <p className="mt-1 text-xs text-slate-400">제품코드는 변경할 수 없습니다</p>
+            </div>
+          )}
 
           <div>
             <label className="block text-sm font-medium text-gray-700">카테고리</label>

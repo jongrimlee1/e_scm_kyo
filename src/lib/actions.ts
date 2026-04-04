@@ -80,7 +80,6 @@ export async function updateProduct(id: string, formData: FormData) {
   const rawBarcode = formData.get('barcode') as string;
   const productData = {
     name: formData.get('name') as string,
-    code: formData.get('code') as string,
     category_id: (rawCategoryId && rawCategoryId !== 'null') ? rawCategoryId : null,
     unit: formData.get('unit') as string || '개',
     price: parseInt(formData.get('price') as string),
