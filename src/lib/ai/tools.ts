@@ -284,6 +284,27 @@ export const AGENT_TOOLS: MiniMaxTool[] = [
   {
     type: 'function',
     function: {
+      name: 'add_customer_consultation',
+      description: '고객 상담 기록을 추가합니다. 방문 예정, 전화 상담, 구매 상담, 민원 처리 등을 기록할 때 사용합니다.',
+      parameters: {
+        type: 'object',
+        properties: {
+          customer_name: { type: 'string', description: '고객 이름' },
+          phone: { type: 'string', description: '고객 전화번호' },
+          consultation_type: {
+            type: 'string',
+            enum: ['전화 상담', '방문 상담', '구매 상담', '민원 처리', '기타'],
+            description: '상담 유형. 방문 관련은 "방문 상담" 사용.',
+          },
+          content: { type: 'string', description: '상담 내용 (자유 텍스트)' },
+        },
+        required: ['content', 'consultation_type'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
       name: 'update_customer_grade',
       description: '특정 고객의 등급을 변경합니다.',
       parameters: {
@@ -618,6 +639,7 @@ export const WRITE_TOOLS = new Set([
   'transfer_inventory',
   'create_customer',
   'update_customer',
+  'add_customer_consultation',
   'update_customer_grade',
   'upgrade_customer_grades',
   'adjust_points',
@@ -686,6 +708,7 @@ export async function executeTool(toolName: string, args: Record<string, any>, s
       case 'transfer_inventory':       return execTransferInventory(sb, args as any);
       case 'create_customer':          return execCreateCustomer(sb, args as any);
       case 'update_customer':          return execUpdateCustomer(sb, args as any);
+      case 'add_customer_consultation':return execAddCustomerConsultation(sb, args as any);
       case 'update_customer_grade':    return execUpdateCustomerGrade(sb, args as any);
       case 'upgrade_customer_grades':  return execUpgradeCustomerGrades(sb);
       case 'adjust_points':            return execAdjustPoints(sb, args as any);
@@ -1251,6 +1274,25 @@ async function execUpdateCustomer(sb: any, args: any): Promise<string> {
   const { error } = await sb.from('customers').update(updates).eq('id', customer.id);
   if (error) return JSON.stringify({ error: error.message });
   return JSON.stringify({ 성공: true, 메시지: `${customer.name} 고객 정보 수정 완료` });
+}
+
+async function execAddCustomerConsultation(sb: any, args: any): Promise<string> {
+  const customer = await findCustomer(sb, args);
+  if (!customer) return JSON.stringify({ error: '고객을 찾을 수 없습니다.' });
+
+  const { error } = await sb.from('customer_consultations').insert({
+    customer_id: customer.id,
+    consultation_type: args.consultation_type,
+    content: { text: args.content },
+    consulted_by: null,
+  });
+  if (error) return JSON.stringify({ error: error.message });
+  return JSON.stringify({
+    성공: true,
+    메시지: `${customer.name} 고객 상담 기록 추가 완료`,
+    상담유형: args.consultation_type,
+    내용: args.content,
+  });
 }
 
 async function execUpdateCustomerGrade(sb: any, args: any): Promise<string> {
