@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { processPosCheckout } from '@/lib/actions';
+import { requestCardApproval } from '@/lib/card-terminal';
 import RefundModal from './RefundModal';
 import ReceiptModal from './ReceiptModal';
 
@@ -65,6 +66,9 @@ export default function POSPage() {
   const [editingQtyVal, setEditingQtyVal] = useState('');
   const [discountType, setDiscountType] = useState<'amount' | 'percent'>('amount');
   const [discountInput, setDiscountInput] = useState('');
+  const [cardApprovalState, setCardApprovalState] = useState<'idle' | 'waiting' | 'approved' | 'error'>('idle');
+  const [cardApprovalResult, setCardApprovalResult] = useState<{ approvalNo?: string; cardInfo?: string } | null>(null);
+  const [cardApprovalError, setCardApprovalError] = useState('');
   // quick register
   const [showQuickReg, setShowQuickReg] = useState(false);
   const [quickName, setQuickName] = useState('');
@@ -278,6 +282,31 @@ export default function POSPage() {
   const cashReceivedNum = parseInt(cashReceived.replace(/,/g, '')) || 0;
   const change = paymentMethod === 'cash' && cashReceivedNum > 0 ? cashReceivedNum - finalAmount : 0;
 
+  // ── 카드 단말기 승인 요청 ──────────────────────────────────────────────────
+  const handleCardApproval = async () => {
+    if (cart.length === 0 || !selectedBranch) return;
+    setCardApprovalState('waiting');
+    setCardApprovalError('');
+
+    const taxAmount = Math.round(finalAmount * 10 / 110);
+    const result = await requestCardApproval(finalAmount, taxAmount);
+
+    if (!result.success) {
+      setCardApprovalState('error');
+      setCardApprovalError(result.errorMessage || '승인 실패');
+      return;
+    }
+
+    const cardInfo = [
+      result.cardName,
+      result.cardLast4 ? `*${result.cardLast4}` : undefined,
+      result.installment && result.installment !== '00' ? `${parseInt(result.installment)}개월` : '일시불',
+    ].filter(Boolean).join(' ');
+
+    setCardApprovalResult({ approvalNo: result.approvalNo, cardInfo });
+    setCardApprovalState('approved');
+  };
+
   // ── 결제 처리 ─────────────────────────────────────────────────────────────
   const handlePayment = async () => {
     if (cart.length === 0) return;
@@ -307,6 +336,8 @@ export default function POSPage() {
         pointsToUse,
         cashReceived: cashReceivedNum > 0 ? cashReceivedNum : undefined,
         userId: getCookie('user_id'),
+        approvalNo: cardApprovalResult?.approvalNo,
+        cardInfo: cardApprovalResult?.cardInfo,
       });
 
       if (result.error) {
@@ -334,6 +365,8 @@ export default function POSPage() {
         finalAmount, pointsUsed: usePoints ? pointsToUse : 0, pointsEarned: pointsEarned || 0,
         paymentMethod, cashReceived: paymentMethod === 'cash' && cashReceivedNum > 0 ? cashReceivedNum : undefined,
         change: paymentMethod === 'cash' && change > 0 ? change : undefined,
+        approvalNo: cardApprovalResult?.approvalNo,
+        cardInfo: cardApprovalResult?.cardInfo,
         orderedAt: new Date().toISOString(),
       });
 
@@ -344,6 +377,9 @@ export default function POSPage() {
       setPointsToUse(0);
       setDiscountInput('');
       setCashReceived('');
+      setCardApprovalState('idle');
+      setCardApprovalResult(null);
+      setCardApprovalError('');
 
     } catch (err: any) {
       console.error('결제 오류:', err);
@@ -711,7 +747,7 @@ export default function POSPage() {
             {(['cash', 'card', 'kakao'] as const).map(m => (
               <button
                 key={m}
-                onClick={() => { setPaymentMethod(m); setCashReceived(''); }}
+                onClick={() => { setPaymentMethod(m); setCashReceived(''); setCardApprovalState('idle'); setCardApprovalResult(null); setCardApprovalError(''); }}
                 className={`py-2 rounded-md text-sm font-medium transition-colors ${
                   paymentMethod === m ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
                 }`}
@@ -765,14 +801,56 @@ export default function POSPage() {
             </div>
           )}
 
-          {/* 결제 버튼 */}
-          <button
-            onClick={handlePayment}
-            disabled={cart.length === 0 || !selectedBranch || processing || (paymentMethod === 'cash' && cashReceivedNum > 0 && change < 0)}
-            className="w-full btn-primary py-3 text-base font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {processing ? '처리 중...' : `결제 (${finalAmount.toLocaleString()}원)`}
-          </button>
+          {/* 결제 버튼 — 카드: 승인 → 결제완료 2단계 */}
+          {paymentMethod === 'card' ? (
+            <div className="space-y-2">
+              {/* 카드 승인 상태 표시 */}
+              {cardApprovalState === 'waiting' && (
+                <div className="flex items-center gap-2 p-3 bg-blue-50 rounded-lg border border-blue-200 text-sm text-blue-700">
+                  <span className="animate-spin">⏳</span>
+                  <span>단말기에서 카드를 읽어주세요...</span>
+                </div>
+              )}
+              {cardApprovalState === 'approved' && cardApprovalResult && (
+                <div className="p-3 bg-green-50 rounded-lg border border-green-200 text-sm space-y-0.5">
+                  <p className="font-semibold text-green-700">승인 완료</p>
+                  {cardApprovalResult.cardInfo && <p className="text-green-600">{cardApprovalResult.cardInfo}</p>}
+                  {cardApprovalResult.approvalNo && <p className="text-xs text-slate-500">승인번호: {cardApprovalResult.approvalNo}</p>}
+                </div>
+              )}
+              {cardApprovalState === 'error' && (
+                <div className="p-3 bg-red-50 rounded-lg border border-red-200 text-sm text-red-600">
+                  {cardApprovalError}
+                </div>
+              )}
+
+              {cardApprovalState !== 'approved' ? (
+                <button
+                  onClick={handleCardApproval}
+                  disabled={cart.length === 0 || !selectedBranch || cardApprovalState === 'waiting'}
+                  className="w-full btn-primary py-3 text-base font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {cardApprovalState === 'waiting' ? '승인 대기 중...' : `카드 승인 요청 (${finalAmount.toLocaleString()}원)`}
+                </button>
+              ) : (
+                <button
+                  onClick={handlePayment}
+                  disabled={processing}
+                  className="w-full py-3 text-base font-semibold rounded-lg bg-green-600 hover:bg-green-700 text-white disabled:opacity-50"
+                >
+                  {processing ? '처리 중...' : '결제 완료'}
+                </button>
+              )}
+            </div>
+          ) : (
+            <button
+              onClick={handlePayment}
+              disabled={cart.length === 0 || !selectedBranch || processing || (paymentMethod === 'cash' && cashReceivedNum > 0 && change < 0)}
+              className="w-full btn-primary py-3 text-base font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {processing ? '처리 중...' : `결제 (${finalAmount.toLocaleString()}원)`}
+            </button>
+          )}
           <button
             onClick={() => setShowRefundModal(true)}
             className="w-full py-2 text-sm text-red-500 border border-red-200 rounded-lg hover:bg-red-50"

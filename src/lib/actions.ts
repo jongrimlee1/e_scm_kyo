@@ -927,6 +927,8 @@ export interface CheckoutPayload {
   pointsToUse: number;
   cashReceived?: number;
   userId: string | null;
+  approvalNo?: string;
+  cardInfo?: string;
 }
 
 export async function processPosCheckout(payload: CheckoutPayload) {
@@ -936,7 +938,7 @@ export async function processPosCheckout(payload: CheckoutPayload) {
   const {
     branchId, branchCode, branchChannel, customerId, gradePointRate,
     cart, totalAmount, discountAmount, finalAmount, paymentMethod,
-    usePoints, pointsToUse, userId,
+    usePoints, pointsToUse, userId, approvalNo, cardInfo,
   } = payload;
 
   // ① 재고 사전 확인
@@ -972,6 +974,8 @@ export async function processPosCheckout(payload: CheckoutPayload) {
     points_earned: pointsEarned,
     points_used: usePoints ? pointsToUse : 0,
     ordered_at: new Date().toISOString(),
+    approval_no: approvalNo || null,
+    card_info: cardInfo || null,
   }).select().single();
 
   if (saleError) return { error: saleError.message };
