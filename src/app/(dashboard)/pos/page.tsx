@@ -69,6 +69,8 @@ export default function POSPage() {
   const [quickPhone, setQuickPhone] = useState('');
   const [quickRegLoading, setQuickRegLoading] = useState(false);
 
+  const [cartOpen, setCartOpen] = useState(false);
+
   const searchRef = useRef<HTMLInputElement>(null);
   const customerInputRef = useRef<HTMLInputElement>(null);
   const editingQtyRef = useRef<HTMLInputElement>(null);
@@ -351,7 +353,7 @@ export default function POSPage() {
 
   // ── 렌더링 ─────────────────────────────────────────────────────────────────
   return (
-    <div className="flex gap-4 h-[calc(100vh-8rem)]">
+    <div className="flex flex-col sm:flex-row gap-4 sm:h-[calc(100vh-8rem)]">
       {/* 왼쪽: 제품 검색 + 그리드 */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* 통합 검색 */}
@@ -374,13 +376,13 @@ export default function POSPage() {
         </div>
 
         {/* 제품 그리드 */}
-        <div className="flex-1 overflow-auto">
+        <div className="flex-1 overflow-auto pb-24 sm:pb-0">
           {loading ? (
             <p className="text-center text-slate-400 py-8">로딩 중...</p>
           ) : filteredProducts.length === 0 && search ? (
             <p className="text-center text-slate-400 py-8">검색 결과가 없습니다</p>
           ) : (
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
               {filteredProducts.map(product => {
                 const stock = getStock(product.id);
                 const inCart = cart.find(i => i.productId === product.id)?.quantity ?? 0;
@@ -422,13 +424,42 @@ export default function POSPage() {
         </div>
       </div>
 
+      {/* 모바일 장바구니 토글 버튼 (하단 고정) */}
+      <div className="sm:hidden fixed bottom-0 left-0 right-0 z-30 p-3 bg-white border-t shadow-lg">
+        <button
+          onClick={() => setCartOpen(prev => !prev)}
+          className="w-full btn-primary min-h-12 text-base font-semibold flex items-center justify-between px-4"
+        >
+          <span>🛒 장바구니 {cart.length > 0 ? `(${cart.length}종)` : ''}</span>
+          <span>{cart.length > 0 ? `${total.toLocaleString()}원 →` : '비어있음'}</span>
+        </button>
+      </div>
+
+      {/* 모바일 장바구니 드로어 backdrop */}
+      {cartOpen && (
+        <div
+          className="sm:hidden fixed inset-0 z-40 bg-black/40"
+          onClick={() => setCartOpen(false)}
+        />
+      )}
+
       {/* 오른쪽: 장바구니 + 결제 */}
-      <div className="w-[400px] bg-white rounded-lg shadow flex flex-col shrink-0">
+      <div className={`
+        sm:w-[400px] sm:static sm:flex sm:flex-col sm:shrink-0
+        fixed bottom-0 left-0 right-0 z-50 flex flex-col
+        bg-white rounded-t-2xl sm:rounded-lg shadow
+        transition-transform duration-300 ease-in-out
+        ${cartOpen ? 'translate-y-0' : 'translate-y-full sm:translate-y-0'}
+        max-h-[90vh] sm:max-h-none sm:h-full
+      `}>
         <div className="px-4 py-3 border-b flex items-center justify-between">
           <h3 className="font-semibold">장바구니 {cart.length > 0 && <span className="text-sm font-normal text-slate-500">({cart.length}종)</span>}</h3>
-          {cart.length > 0 && (
-            <button onClick={() => setCart([])} className="text-xs text-red-400 hover:text-red-600">전체 삭제</button>
-          )}
+          <div className="flex items-center gap-3">
+            {cart.length > 0 && (
+              <button onClick={() => setCart([])} className="text-xs text-red-400 hover:text-red-600">전체 삭제</button>
+            )}
+            <button onClick={() => setCartOpen(false)} className="sm:hidden text-slate-400 hover:text-slate-600 text-lg leading-none">✕</button>
+          </div>
         </div>
 
         {/* 장바구니 목록 */}

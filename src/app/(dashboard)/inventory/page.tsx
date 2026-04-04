@@ -143,7 +143,7 @@ export default function InventoryPage() {
 
   return (
     <div className="card">
-      <div className="flex justify-between items-center mb-6">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4 sm:mb-6">
         <div className="flex items-center gap-3">
           <h3 className="font-semibold text-lg">재고 현황</h3>
           {lowCount > 0 && (
@@ -152,11 +152,11 @@ export default function InventoryPage() {
             </span>
           )}
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <Link href="/inventory/count" className="btn-secondary py-2 px-4 text-sm">재고 실사</Link>
           <button
             onClick={() => { setEditInventory(null); setShowModal(true); }}
-            className="btn-primary"
+            className="btn-primary text-sm"
           >
             + 입출고
           </button>
@@ -164,13 +164,13 @@ export default function InventoryPage() {
       </div>
 
       {/* 검색 + 뷰 전환 */}
-      <div className="flex gap-3 mb-4 flex-wrap items-center">
+      <div className="flex flex-col sm:flex-row gap-3 mb-4 flex-wrap items-start sm:items-center">
         <input
           type="text"
           placeholder="제품명 / 코드 / 바코드 검색..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="input w-64"
+          className="input w-full sm:w-64"
         />
 
         {/* 뷰 모드 토글 — 지점 고정 사용자는 지점별만 */}
@@ -205,7 +205,7 @@ export default function InventoryPage() {
             value={flatBranchFilter}
             onChange={(e) => setFlatBranchFilter(e.target.value)}
             disabled={isBranchUser}
-            className={`input w-44 ${isBranchUser ? 'bg-slate-100 cursor-not-allowed' : ''}`}
+            className={`input w-full sm:w-44 ${isBranchUser ? 'bg-slate-100 cursor-not-allowed' : ''}`}
           >
             <option value="">전체 지점</option>
             {branches.map(b => (
@@ -220,7 +220,7 @@ export default function InventoryPage() {
       ) : viewMode === 'pivot' ? (
         /* ── 제품별 피벗 뷰 ── */
         <div className="overflow-x-auto">
-          <table className="table text-sm">
+          <table className="table text-sm min-w-[500px]">
             <thead>
               <tr>
                 <th className="w-24">코드</th>
@@ -295,7 +295,8 @@ export default function InventoryPage() {
         </div>
       ) : (
         /* ── 지점별 플랫 뷰 ── */
-        <table className="table">
+        <div className="overflow-x-auto">
+        <table className="table min-w-[640px]">
           <thead>
             <tr>
               <th>지점</th>
@@ -353,6 +354,7 @@ export default function InventoryPage() {
             })}
           </tbody>
         </table>
+        </div>
       )}
 
       {showModal && (

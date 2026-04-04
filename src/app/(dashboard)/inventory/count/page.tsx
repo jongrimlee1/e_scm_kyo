@@ -208,38 +208,38 @@ export default function InventoryCountPage() {
       </div>
 
       {/* 진행 요약 */}
-      <div className="grid grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
         <div className="card text-center">
-          <p className="text-sm text-slate-500">전체 품목</p>
-          <p className="text-2xl font-bold text-slate-800 mt-1">{rows.length}</p>
+          <p className="text-xs sm:text-sm text-slate-500">전체 품목</p>
+          <p className="text-xl sm:text-2xl font-bold text-slate-800 mt-1">{rows.length}</p>
         </div>
         <div className="card text-center">
-          <p className="text-sm text-slate-500">실사 입력</p>
-          <p className={`text-2xl font-bold mt-1 ${allCounted ? 'text-green-600' : 'text-blue-700'}`}>
+          <p className="text-xs sm:text-sm text-slate-500">실사 입력</p>
+          <p className={`text-xl sm:text-2xl font-bold mt-1 ${allCounted ? 'text-green-600' : 'text-blue-700'}`}>
             {countedCount} / {rows.length}
           </p>
         </div>
         <div className="card text-center">
-          <p className="text-sm text-slate-500">차이 발생</p>
-          <p className={`text-2xl font-bold mt-1 ${diffCount > 0 ? 'text-amber-600' : 'text-slate-400'}`}>{diffCount}</p>
+          <p className="text-xs sm:text-sm text-slate-500">차이 발생</p>
+          <p className={`text-xl sm:text-2xl font-bold mt-1 ${diffCount > 0 ? 'text-amber-600' : 'text-slate-400'}`}>{diffCount}</p>
         </div>
         <div className="card text-center">
-          <p className="text-sm text-slate-500">순 차이 수량</p>
-          <p className={`text-2xl font-bold mt-1 ${totalDiffQty > 0 ? 'text-green-600' : totalDiffQty < 0 ? 'text-red-600' : 'text-slate-400'}`}>
+          <p className="text-xs sm:text-sm text-slate-500">순 차이 수량</p>
+          <p className={`text-xl sm:text-2xl font-bold mt-1 ${totalDiffQty > 0 ? 'text-green-600' : totalDiffQty < 0 ? 'text-red-600' : 'text-slate-400'}`}>
             {totalDiffQty > 0 ? '+' : ''}{totalDiffQty}
           </p>
         </div>
       </div>
 
       <div className="card">
-        <div className="flex flex-wrap gap-3 items-center mb-4">
+        <div className="flex flex-col sm:flex-row gap-3 mb-4 flex-wrap items-start sm:items-center">
           <input type="text" value={search} onChange={e => setSearch(e.target.value)}
-            placeholder="제품명/코드 검색..." className="input w-52" />
+            placeholder="제품명/코드 검색..." className="input w-full sm:w-52" />
           <label className="flex items-center gap-2 text-sm cursor-pointer">
             <input type="checkbox" checked={showDiffOnly} onChange={e => setShowDiffOnly(e.target.checked)} />
             차이 항목만
           </label>
-          <div className="ml-auto flex gap-2">
+          <div className="sm:ml-auto flex gap-2">
             <button onClick={() => setAll('system')} className="text-xs text-blue-600 hover:underline">시스템값으로 채우기</button>
             <span className="text-slate-300">|</span>
             <button onClick={() => setAll('zero')} className="text-xs text-slate-400 hover:underline">전체 0으로</button>
@@ -250,7 +250,7 @@ export default function InventoryCountPage() {
           <div className="text-center py-10 text-slate-400">로딩 중...</div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="table">
+            <table className="table min-w-[500px]">
               <thead>
                 <tr>
                   <th>제품</th>
