@@ -71,9 +71,9 @@ CREATE POLICY purchase_order_items_all ON purchase_order_items FOR ALL TO authen
 DROP POLICY IF EXISTS production_orders_all ON production_orders;
 CREATE POLICY production_orders_all ON production_orders FOR ALL TO authenticated USING (true) WITH CHECK (true);
 
--- ── product_boms: authenticated만
-DROP POLICY IF EXISTS product_boms_all ON product_boms;
-CREATE POLICY product_boms_all ON product_boms FOR ALL TO authenticated USING (true) WITH CHECK (true);
+-- ── product_bom: authenticated만
+DROP POLICY IF EXISTS product_bom_all ON product_bom;
+CREATE POLICY product_bom_all ON product_bom FOR ALL TO authenticated USING (true) WITH CHECK (true);
 
 -- ── notifications: authenticated만
 DROP POLICY IF EXISTS notifications_all ON notifications;
